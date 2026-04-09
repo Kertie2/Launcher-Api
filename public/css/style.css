@@ -48,7 +48,7 @@ body {
 
 .header-logos img {
     height: 50px;
-    filter: brightness(0) invert(1);
+    /* filter: brightness(0) invert(1); */
 }
 
 .header-logos .separator {

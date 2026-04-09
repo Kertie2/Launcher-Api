@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — Administration MDM</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #F5F6FA; }
+
+        /* HEADER */
+        .header {
+            background: linear-gradient(135deg, #001F5C, #003189);
+            padding: 0 35px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.2);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-logos {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-logos img {
+            height: 40px;
+            object-fit: contain;
+        }
+
+        .header-sep {
+            width: 1px;
+            height: 30px;
+            background: rgba(255,255,255,0.25);
+        }
+
+        .header-title {
+            color: white;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+        .header-title span {
+            font-weight: 400;
+            opacity: 0.7;
+            font-size: 13px;
+            display: block;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            padding: 8px 14px;
+            color: white;
+            font-size: 13px;
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .btn-logout {
+            background: rgba(225,0,15,0.8);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover { background: #E1000F; }
+
+        /* LAYOUT */
+        .layout {
+            display: flex;
+            min-height: calc(100vh - 70px);
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 240px;
+            background: white;
+            border-right: 1px solid #E8ECF0;
+            padding: 25px 15px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 70px;
+            height: calc(100vh - 70px);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 30px;
+        }
+
+        .sidebar-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #9CA3AF;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            padding: 0 10px;
+            margin-bottom: 8px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #374151;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s;
+            margin-bottom: 3px;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+
+        .nav-item:hover {
+            background: #EEF2FF;
+            color: #003189;
+        }
+
+        .nav-item.active {
+            background: #003189;
+            color: white;
+        }
+
+        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+        .nav-badge {
+            margin-left: auto;
+            background: #E1000F;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 10px;
+        }
+
+        .nav-item.active .nav-badge { background: rgba(255,255,255,0.3); }
+
+        /* MAIN */
+        .main {
+            flex: 1;
+            padding: 35px;
+            overflow-y: auto;
+        }
+
+        /* PAGES */
+        .page { display: none; }
+        .page.active { display: block; animation: fadeIn 0.3s ease; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .page-header {
+            margin-bottom: 30px;
+        }
+
+        .page-header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            color: #001F5C;
+            margin-bottom: 5px;
+        }
+
+        .page-header p {
+            font-size: 14px;
+            color: #6B7280;
+        }
+
+        /* STATS */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 18px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 22px;
+            border: 1px solid #E8ECF0;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+        }
+
+        .stat-card.bleu::before { background: #003189; }
+        .stat-card.vert::before { background: #10B981; }
+        .stat-card.rouge::before { background: #E1000F; }
+        .stat-card.orange::before { background: #F59E0B; }
+
+        .stat-icon {
+            font-size: 28px;
+            margin-bottom: 12px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 800;
+            color: #111827;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #6B7280;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* TABLE CARD */
+        .card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #E8ECF0;
+            overflow: hidden;
+            margin-bottom: 25px;
+        }
+
+        .card-header {
+            padding: 18px 25px;
+            border-bottom: 1px solid #E8ECF0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-header h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .card-header p {
+            font-size: 12px;
+            color: #6B7280;
+            margin-top: 2px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #F9FAFB;
+            padding: 11px 20px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            color: #6B7280;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            border-bottom: 1px solid #E8ECF0;
+        }
+
+        td {
+            padding: 14px 20px;
+            font-size: 14px;
+            color: #111827;
+            border-bottom: 1px solid #F3F4F6;
+        }
+
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #F9FAFB; }
+
+        /* BADGES */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+        }
+
+        .badge-actif { background: #D1FAE5; color: #065F46; }
+        .badge-actif::before { background: #10B981; }
+        .badge-bloque { background: #FEE2E2; color: #991B1B; }
+        .badge-bloque::before { background: #E1000F; }
+        .badge-inactif { background: #F3F4F6; color: #6B7280; }
+        .badge-inactif::before { background: #9CA3AF; }
+
+        /* BOUTONS */
+        .btn {
+            padding: 7px 14px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-primary { background: #003189; color: white; }
+        .btn-primary:hover { background: #001F5C; }
+        .btn-danger { background: #E1000F; color: white; }
+        .btn-danger:hover { background: #c0000d; }
+        .btn-success { background: #10B981; color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-ghost { background: #F3F4F6; color: #374151; }
+        .btn-ghost:hover { background: #E5E7EB; }
+
+        /* DEVICE CARDS */
+        .devices-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 18px;
+            margin-bottom: 25px;
+        }
+
+        .device-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #E8ECF0;
+            padding: 20px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .device-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        }
+
+        .device-card.blacklisted {
+            border-color: #FECACA;
+            background: #FFF5F5;
+        }
+
+        .device-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: #10B981;
+        }
+
+        .device-card.blacklisted::before { background: #E1000F; }
+
+        .device-card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .device-info h4 {
+            font-size: 15px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 3px;
+        }
+
+        .device-info p {
+            font-size: 12px;
+            color: #6B7280;
+        }
+
+        .device-icon {
+            font-size: 28px;
+            opacity: 0.8;
+        }
+
+        .device-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .device-meta-item {
+            background: #F9FAFB;
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+
+        .device-meta-item .label {
+            font-size: 10px;
+            color: #9CA3AF;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 3px;
+        }
+
+        .device-meta-item .value {
+            font-size: 12px;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .device-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* MODAL */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-overlay.open {
+            display: flex;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 35px;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 8px;
+        }
+
+        .modal p {
+            font-size: 14px;
+            color: #6B7280;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .form-group { margin-bottom: 18px; }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #374151;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid #E5E7EB;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Segoe UI', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #003189;
+            box-shadow: 0 0 0 3px rgba(0,49,137,0.08);
+        }
+
+        /* TOAST */
+        .toast-container {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: #111827;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideInRight 0.3s ease;
+            max-width: 320px;
+        }
+
+        .toast.success { border-left: 4px solid #10B981; }
+        .toast.error { border-left: 4px solid #E1000F; }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* LOADING */
+        .loading-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            color: #6B7280;
+            font-size: 14px;
+            gap: 12px;
+        }
+
+        .device-card.offline {
+    opacity: 0.7;
+}
+
+.device-card.offline::before {
+    background: #9CA3AF;
+}
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #E5E7EB;
+            border-top-color: #003189;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: #6B7280;
+        }
+
+        .empty-state .icon { font-size: 48px; margin-bottom: 15px; }
+        .empty-state h3 { font-size: 18px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+        .empty-state p { font-size: 14px; }
+
+        /* APP GRID */
+        .apps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 15px;
+}
+
+.app-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #E8ECF0;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s;
+    min-width: 0; /* Important pour éviter le débordement */
+}
+
+.app-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+}
+
+.app-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.app-icon-fallback {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #003189, #4A7FE5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.app-info {
+    flex: 1;
+    min-width: 0; /* Permet la troncature du texte */
+}
+
+.app-info h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.app-info p {
+    font-size: 11px;
+    color: #9CA3AF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.app-card .btn-danger {
+    flex-shrink: 0;
+}
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <div class="header-left">
+        <div class="header-logos">
+            <img src="/images/logo_aude.png" alt="Aude">
+        </div>
+        <div class="header-sep"></div>
+        <div class="header-title">
+            Interface d'Administration
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="user-badge">
+            <div class="user-avatar" id="userAvatar">?</div>
+            <span id="userName">Chargement...</span>
+        </div>
+        <button class="btn-logout" onclick="logout()">Déconnexion</button>
+    </div>
+</div>
+
+<div class="layout">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-section">
+            <div class="sidebar-label">Navigation</div>
+            <button class="nav-item active" onclick="showPage('tablettes')">
+                <span class="nav-icon">📱</span>
+                Tablettes
+                <span class="nav-badge" id="nbTablettes">0</span>
+            </button>
+            <button class="nav-item" onclick="showPage('applications')">
+                <span class="nav-icon">📦</span>
+                Applications
+            </button>
+            <button class="nav-item" onclick="showPage('logs')">
+                <span class="nav-icon">📋</span>
+                Journaux
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+
+        <!-- PAGE TABLETTES -->
+        <div class="page active" id="page-tablettes">
+            <div class="page-header">
+                <h1>Gestion des tablettes</h1>
+                <p>Gérez et surveillez toutes les tablettes du parc</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card bleu">
+                    <div class="stat-icon">📱</div>
+                    <div class="stat-value" id="stat-total">—</div>
+                    <div class="stat-label">Total tablettes</div>
+                </div>
+                <div class="stat-card vert">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-value" id="stat-actives">—</div>
+                    <div class="stat-label">Actives</div>
+                </div>
+                <div class="stat-card rouge">
+                    <div class="stat-icon">🚫</div>
+                    <div class="stat-value" id="stat-bloquees">—</div>
+                    <div class="stat-label">Bloquées</div>
+                </div>
+                <div class="stat-card orange">
+                    <div class="stat-icon">👤</div>
+                    <div class="stat-value" id="stat-utilisees">—</div>
+                    <div class="stat-label">En cours d'utilisation</div>
+                </div>
+            </div>
+
+            <div class="devices-grid" id="devicesGrid">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    Chargement des tablettes...
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE APPLICATIONS -->
+        <div class="page" id="page-applications">
+            <div class="page-header">
+                <h1>Gestion des applications</h1>
+                <p>Gérez les applications disponibles sur les tablettes</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h3>Applications autorisées</h3>
+                        <p>Ces applications sont disponibles sur toutes les tablettes</p>
+                    </div>
+                </div>
+                <div style="padding: 20px;">
+                    <div class="apps-grid" id="appsGrid">
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                            Chargement...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE LOGS -->
+        <div class="page" id="page-logs">
+            <div class="page-header">
+                <h1>Journaux de connexion</h1>
+                <p>Historique des connexions sur les tablettes</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h3>Dernières connexions</h3>
+                        <p>50 dernières entrées</p>
+                    </div>
+                    <button class="btn btn-ghost" onclick="loadLogs()">🔄 Rafraîchir</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Utilisateur</th>
+                            <th>Tablette</th>
+                            <th>Date & Heure</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsBody">
+                        <tr><td colspan="3" class="loading-state"><div class="spinner"></div> Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- MODAL BLACKLIST -->
+<div class="modal-overlay" id="modalBlacklist">
+    <div class="modal">
+        <h3>🚫 Bloquer la tablette</h3>
+        <p>Cette tablette sera immédiatement bloquée. L'utilisateur sera déconnecté lors du prochain heartbeat.</p>
+        <div class="form-group">
+            <label class="form-label">Raison du blocage</label>
+            <input type="text" class="form-control" id="blacklistReason" placeholder="Ex: Comportement inapproprié...">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeModal('modalBlacklist')">Annuler</button>
+            <button class="btn btn-danger" onclick="confirmBlacklist()">Bloquer</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DÉBLOQUER -->
+<div class="modal-overlay" id="modalUnblock">
+    <div class="modal">
+        <h3>✅ Débloquer la tablette</h3>
+        <p>Voulez-vous débloquer cette tablette ? Elle pourra à nouveau être utilisée.</p>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeModal('modalUnblock')">Annuler</button>
+            <button class="btn btn-success" onclick="confirmUnblock()">Débloquer</button>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+    const token = localStorage.getItem('token');
+    const displayName = localStorage.getItem('displayName');
+
+    // Vérifie l'auth au chargement
+    if (!token) window.location.href = '/login';
+
+    // Affiche le nom de l'admin
+    if (displayName) {
+        document.getElementById('userName').textContent = displayName;
+        document.getElementById('userAvatar').textContent = displayName.charAt(0).toUpperCase();
+    }
+
+    let currentBlacklistDevice = null;
+    let currentUnblockDevice = null;
+
+    // --- NAVIGATION ---
+    function showPage(page) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById(`page-${page}`).classList.add('active');
+        event.currentTarget.classList.add('active');
+
+        if (page === 'tablettes') loadDevices();
+        if (page === 'applications') loadApps();
+        if (page === 'logs') loadLogs();
+    }
+
+    // --- API HELPER ---
+    async function api(method, endpoint, body = null) {
+        const opts = {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(endpoint, opts);
+        if (res.status === 401) { logout(); return null; }
+        return res.json();
+    }
+
+async function loadDevices() {
+    const grid = document.getElementById('devicesGrid');
+    grid.innerHTML = '<div class="loading-state"><div class="spinner"></div> Chargement...</div>';
+
+    const devices = await api('GET', '/api/devices');
+    if (!devices) return;
+
+    // Stats
+    document.getElementById('stat-total').textContent = devices.length;
+    document.getElementById('stat-actives').textContent = 
+        devices.filter(d => d.adb_status === 'Connected' && !d.blacklisted).length;
+    document.getElementById('stat-bloquees').textContent = 
+        devices.filter(d => d.blacklisted).length;
+    document.getElementById('stat-utilisees').textContent = 
+        devices.filter(d => d.assigned_user && d.adb_status === 'Connected').length;
+    document.getElementById('nbTablettes').textContent = devices.length;
+
+    if (devices.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state" style="grid-column: 1/-1">
+                <div class="icon">📱</div>
+                <h3>Aucune tablette enregistrée</h3>
+                <p>Les tablettes apparaîtront ici après leur première connexion</p>
+            </div>`;
+        return;
+    }
+
+    grid.innerHTML = devices.map(d => {
+        const isConnected = d.adb_status === 'Connected';
+        const isBlacklisted = !!d.blacklisted;
+
+        // Badge statut
+        let statusBadge;
+        if (isBlacklisted) {
+            statusBadge = '<span class="badge badge-bloque">Bloquée</span>';
+        } else if (isConnected) {
+            statusBadge = '<span class="badge badge-actif">Connectée</span>';
+        } else {
+            statusBadge = '<span class="badge badge-inactif">Hors ligne</span>';
+        }
+
+        // Dernière activité
+        const lastSeen = d.last_seen 
+            ? new Date(d.last_seen).toLocaleString('fr-FR')
+            : '—';
+
+        return `
+            <div class="device-card ${isBlacklisted ? 'blacklisted' : ''} ${!isConnected && !isBlacklisted ? 'offline' : ''}">
+                <div class="device-card-header">
+                    <div class="device-info">
+                        <h4>${d.device_id}</h4>
+                        <p>${d.assigned_user || 'Aucun utilisateur'}</p>
+                    </div>
+                    <div class="device-icon">${isConnected && !isBlacklisted ? '📱' : '💤'}</div>
+                </div>
+                <div class="device-meta">
+                    <div class="device-meta-item">
+                        <div class="label">Statut</div>
+                        <div class="value">${statusBadge}</div>
+                    </div>
+                    <div class="device-meta-item">
+                        <div class="label">IP</div>
+                        <div class="value">${d.last_ip || '—'}</div>
+                    </div>
+                    <div class="device-meta-item">
+                        <div class="label">Dernière activité</div>
+                        <div class="value">${lastSeen}</div>
+                    </div>
+                    <div class="device-meta-item">
+                        <div class="label">Utilisateur</div>
+                        <div class="value">${d.assigned_user || '—'}</div>
+                    </div>
+                </div>
+                ${isBlacklisted && d.blacklist_reason ? `
+                    <div style="background:#FEE2E2;border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:12px;color:#991B1B;">
+                        🚫 ${d.blacklist_reason}
+                    </div>` : ''}
+                <div class="device-actions">
+                    ${isBlacklisted 
+                        ? `<button class="btn btn-success" onclick="openUnblock('${d.device_id}')">✅ Débloquer</button>`
+                        : `<button class="btn btn-danger" onclick="openBlacklist('${d.device_id}')">🚫 Bloquer</button>`
+                    }
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+    // --- BLACKLIST ---
+    function openBlacklist(deviceId) {
+        currentBlacklistDevice = deviceId;
+        document.getElementById('blacklistReason').value = '';
+        document.getElementById('modalBlacklist').classList.add('open');
+    }
+
+    async function confirmBlacklist() {
+        const reason = document.getElementById('blacklistReason').value.trim();
+        await api('POST', `/api/devices/${currentBlacklistDevice}/blacklist`, { reason });
+        closeModal('modalBlacklist');
+        showToast('Tablette bloquée avec succès', 'success');
+        loadDevices();
+    }
+
+    function openUnblock(deviceId) {
+        currentUnblockDevice = deviceId;
+        document.getElementById('modalUnblock').classList.add('open');
+    }
+
+    async function confirmUnblock() {
+        await api('DELETE', `/api/devices/${currentUnblockDevice}/blacklist`);
+        closeModal('modalUnblock');
+        showToast('Tablette débloquée avec succès', 'success');
+        loadDevices();
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('open');
+    }
+
+    // Ferme modal en cliquant outside
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.classList.remove('open');
+        });
+    });
+
+    // --- APPLICATIONS ---
+    async function loadApps() {
+        const grid = document.getElementById('appsGrid');
+        grid.innerHTML = '<div class="loading-state"><div class="spinner"></div> Chargement...</div>';
+
+        const apps = await api('GET', '/api/apps');
+        if (!apps || apps.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state" style="grid-column: 1/-1">
+                    <div class="icon">📦</div>
+                    <h3>Aucune application</h3>
+                    <p>Ajoutez des applications depuis l'interface admin de la tablette</p>
+                </div>`;
+            return;
+        }
+
+        grid.innerHTML = apps.map(app => {
+            const imgUrl = `/uploads/${app.packageName}.png`;
+            return `
+                <div class="app-card">
+                    <img class="app-icon" 
+                        src="${imgUrl}" 
+                        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                        alt="${app.appName}">
+                    <div class="app-icon-fallback" style="display:none">
+                        ${app.appName.charAt(0).toUpperCase()}
+                    </div>
+                    <div class="app-info">
+                        <h4>${app.appName}</h4>
+                        <p>${app.packageName}</p>
+                    </div>
+                    <button class="btn btn-danger" onclick="deleteApp(${app.id}, '${app.appName}')">🗑</button>
+                </div>`;
+        }).join('');
+    }
+
+    async function deleteApp(id, name) {
+        if (!confirm(`Supprimer "${name}" ?`)) return;
+        await api('DELETE', `/api/apps/${id}`);
+        showToast(`${name} supprimée`, 'success');
+        loadApps();
+    }
+
+    // --- LOGS ---
+    async function loadLogs() {
+        const body = document.getElementById('logsBody');
+        body.innerHTML = '<tr><td colspan="3" class="loading-state"><div class="spinner"></div> Chargement...</td></tr>';
+
+        const logs = await api('GET', '/api/logs');
+        if (!logs || logs.length === 0) {
+            body.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:30px;color:#6B7280">Aucun journal disponible</td></tr>';
+            return;
+        }
+
+        body.innerHTML = logs.map(log => `
+            <tr>
+                <td><strong>${log.username}</strong></td>
+                <td>${log.device_id}</td>
+                <td>${new Date(log.timestamp).toLocaleString('fr-FR')}</td>
+            </tr>
+        `).join('');
+    }
+
+    // --- TOAST ---
+    function showToast(msg, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span> ${msg}`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    // --- LOGOUT ---
+    function logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('displayName');
+        window.location.href = '/login';
+    }
+
+    // Chargement initial
+    loadDevices();
+
+    // Rafraîchissement auto toutes les 30s
+    setInterval(() => {
+        const activePage = document.querySelector('.page.active').id;
+        if (activePage === 'page-tablettes') loadDevices();
+    }, 30000);
+</script>
+</body>
+</html>
