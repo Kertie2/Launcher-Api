@@ -1,0 +1,5 @@
+*.apk
+*.png
+*.sqlite
+node_modules/
+logs/
