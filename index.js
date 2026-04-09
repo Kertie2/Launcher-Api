@@ -7,6 +7,8 @@ const path = require('path');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/apks/' });
 const { generateToken, requireAuth, requireAdmin } = require('./middleware/auth');
+const ApkReader = require('adbkit-apkreader');
+const uploadWeb = multer({ dest: 'uploads/tmp/' });
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -219,6 +221,103 @@ app.get('/api/logs', requireAuth, requireAdmin, (req, res) => {
         [], (err, rows) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(rows);
+        }
+    );
+});
+
+// Étape 1 : Upload APK et retourne les icônes disponibles
+app.post('/api/apps/web/preview', requireAuth, requireAdmin, uploadWeb.single('apk'), async (req, res) => {
+    const apkFile = req.file;
+    if (!apkFile) return res.status(400).json({ error: "APK manquant" });
+
+    try {
+        const AdmZip = require('adm-zip');
+        const zip = new AdmZip(apkFile.path);
+        const entries = zip.getEntries();
+
+        // Collecte toutes les icônes PNG/WEBP
+        const icons = [];
+        const iconPriority = [
+            'mipmap-xxxhdpi', 'mipmap-xxhdpi', 'mipmap-xhdpi', 'mipmap-hdpi',
+            'drawable-xxxhdpi', 'drawable-xxhdpi', 'drawable-xhdpi', 'drawable-hdpi',
+            'mipmap-anydpi', 'mipmap-mdpi', 'drawable-mdpi'
+        ];
+
+        for (const entry of entries) {
+            if (
+                (entry.entryName.endsWith('.png') || entry.entryName.endsWith('.webp')) &&
+                !entry.entryName.includes('9.png') // Exclut les 9-patch
+            ) {
+                // Sauvegarde temporairement l'icône
+                const tmpName = `tmp_${Date.now()}_${icons.length}.png`;
+                const tmpPath = path.join(__dirname, 'uploads/tmp', tmpName);
+                fs.writeFileSync(tmpPath, entry.getData());
+
+                // Calcule la priorité
+                const priority = iconPriority.findIndex(p => entry.entryName.includes(p));
+
+                icons.push({
+                    path: entry.entryName,
+                    tmpFile: tmpName,
+                    priority: priority === -1 ? 999 : priority,
+                    url: `/uploads/tmp/${tmpName}`
+                });
+            }
+        }
+
+        // Trie par priorité
+        icons.sort((a, b) => a.priority - b.priority);
+
+        // Sauvegarde le chemin de l'APK temporaire pour l'étape 2
+        res.json({
+            success: true,
+            tmpApk: path.basename(apkFile.path),
+            icons: icons.slice(0, 20) // Max 20 icônes affichées
+        });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Étape 2 : Confirme l'ajout avec l'icône choisie
+app.post('/api/apps/web/confirm', requireAuth, requireAdmin, (req, res) => {
+    const { appName, packageName, tmpApk, selectedIcon } = req.body;
+
+    if (!appName || !packageName || !tmpApk) {
+        return res.status(400).json({ error: "Données manquantes" });
+    }
+
+    if (!isValidPackageName(packageName)) {
+        return res.status(400).json({ error: "Nom de package invalide" });
+    }
+
+    // Copie l'icône choisie
+    if (selectedIcon) {
+        const srcIcon = path.join(__dirname, 'uploads/tmp', selectedIcon);
+        const destIcon = path.join(__dirname, 'uploads', `${packageName}.png`);
+        if (fs.existsSync(srcIcon)) fs.copyFileSync(srcIcon, destIcon);
+    }
+
+    // Déplace l'APK
+    const srcApk = path.join(__dirname, 'uploads/tmp', tmpApk);
+    const destApk = path.join(__dirname, 'uploads/apks', `${packageName}.apk`);
+    if (fs.existsSync(srcApk)) fs.renameSync(srcApk, destApk);
+
+    // Nettoie les icônes temporaires
+    const tmpDir = path.join(__dirname, 'uploads/tmp');
+    fs.readdirSync(tmpDir).forEach(f => {
+        if (f.startsWith('tmp_')) fs.unlinkSync(path.join(tmpDir, f));
+    });
+
+    db.run(
+        "INSERT OR REPLACE INTO apps (appName, package) VALUES (?, ?)",
+        [appName, packageName],
+        function(err) {
+            if (err) return res.status(400).json({ error: err.message });
+            console.log(`📦 App confirmée : ${appName} (${packageName})`);
+            res.json({ success: true, id: this.lastID });
         }
     );
 });
