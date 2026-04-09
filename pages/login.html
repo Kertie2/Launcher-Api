@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration — Collège Saint-Exupéry</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #001F5C;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* FOND ANIMÉ */
+        .bg-animated {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background: linear-gradient(135deg, #001040 0%, #003189 50%, #001F5C 100%);
+        }
+
+        .bg-animated::before {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 70%);
+            top: -200px;
+            left: -200px;
+            animation: float1 8s ease-in-out infinite;
+        }
+
+        .bg-animated::after {
+            content: '';
+            position: absolute;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+            bottom: -300px;
+            right: -200px;
+            animation: float2 10s ease-in-out infinite;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.15;
+            animation: float3 12s ease-in-out infinite;
+            z-index: 0;
+        }
+
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: #4A7FE5;
+            top: 10%;
+            right: 10%;
+            animation-delay: -3s;
+        }
+
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            background: #E1000F;
+            bottom: 10%;
+            left: 5%;
+            animation-delay: -6s;
+            opacity: 0.08;
+        }
+
+        .orb-3 {
+            width: 250px;
+            height: 250px;
+            background: #7BA7FF;
+            top: 50%;
+            left: 30%;
+            animation-delay: -1s;
+            opacity: 0.1;
+        }
+
+        @keyframes float1 {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(40px, 30px); }
+        }
+
+        @keyframes float2 {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-30px, -40px); }
+        }
+
+        @keyframes float3 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(20px, -20px) scale(1.05); }
+            66% { transform: translate(-15px, 15px) scale(0.95); }
+        }
+
+        /* GRILLE DÉCORATIVE */
+        .grid-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        /* WRAPPER PRINCIPAL */
+        .login-wrapper {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 35px;
+            width: 100%;
+            max-width: 480px;
+            padding: 20px;
+            animation: fadeInUp 0.8s ease forwards;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* LOGOS */
+        .login-logos {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 25px;
+            animation: fadeInUp 0.8s ease 0.1s both;
+        }
+
+        .login-logos img {
+            height: 65px;
+            /* filter: brightness(0) invert(1); */
+            transition: transform 0.3s ease;
+            object-fit: contain;
+        }
+
+        .login-logos img:hover {
+            transform: scale(1.05);
+        }
+
+        .logo-separator {
+            width: 1px;
+            height: 50px;
+            background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.4), transparent);
+        }
+
+        /* BADGE REPUBLIQUE */
+        .republic-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 30px;
+            padding: 6px 18px;
+            animation: fadeInUp 0.8s ease 0.2s both;
+        }
+
+        .republic-badge .flag {
+            display: flex;
+            gap: 3px;
+        }
+
+        .republic-badge .flag span {
+            width: 8px;
+            height: 14px;
+            border-radius: 1px;
+        }
+
+        .flag-blue { background: #002395; }
+        .flag-white { background: #FFFFFF; }
+        .flag-red { background: #ED2939; }
+
+        .republic-badge p {
+            color: rgba(255,255,255,0.7);
+            font-size: 11px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        /* CARTE LOGIN */
+        .login-card {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 16px;
+            padding: 45px 45px 40px;
+            box-shadow: 
+                0 30px 80px rgba(0,0,0,0.4),
+                0 0 0 1px rgba(255,255,255,0.1);
+            animation: fadeInUp 0.8s ease 0.3s both;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #003189, #4A7FE5, #003189);
+            background-size: 200% 100%;
+            animation: shimmer 3s ease infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .login-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #003189, #4A7FE5);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 18px;
+            font-size: 24px;
+            box-shadow: 0 8px 20px rgba(0,49,137,0.3);
+        }
+
+        .login-header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #001F5C;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+
+        .login-header p {
+            font-size: 13px;
+            color: #6C757D;
+            line-height: 1.5;
+        }
+
+        /* CHAMPS */
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #001F5C;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            color: #6C757D;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 14px 12px 42px;
+            border: 1.5px solid #DEE2E6;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Segoe UI', sans-serif;
+            transition: all 0.2s;
+            background: #F8F9FA;
+            color: #1A1A1A;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #003189;
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(0,49,137,0.08);
+        }
+
+        .form-control:focus + .input-icon,
+        .input-wrapper:focus-within .input-icon {
+            color: #003189;
+        }
+
+        /* BOUTON */
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #003189, #1a4aaa);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            letter-spacing: 0.3px;
+            position: relative;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .btn-login::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px rgba(0,49,137,0.4);
+        }
+
+        .btn-login:hover::after { opacity: 1; }
+
+        .btn-login:active { transform: translateY(0); }
+
+        .btn-login:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-login .spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn-login.loading .spinner { display: inline-block; }
+        .btn-login.loading .btn-text::after { content: '...'; }
+
+        /* ERREUR */
+        .error-msg {
+            display: none;
+            background: #FFF0F0;
+            border: 1px solid #FFB3B3;
+            border-left: 4px solid #E1000F;
+            border-radius: 6px;
+            padding: 12px 15px;
+            font-size: 13px;
+            color: #721C24;
+            margin-bottom: 20px;
+            animation: shake 0.4s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+        }
+
+        /* INFO BAS DE CARTE */
+        .login-footer {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #F0F0F0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .login-footer .dot {
+            width: 6px;
+            height: 6px;
+            background: #28A745;
+            border-radius: 50%;
+            animation: pulse-dot 2s ease infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        .login-footer p {
+            font-size: 12px;
+            color: #6C757D;
+        }
+
+        /* FOOTER PAGE */
+        .page-footer {
+            color: rgba(255,255,255,0.35);
+            font-size: 11px;
+            text-align: center;
+            letter-spacing: 0.5px;
+            animation: fadeInUp 0.8s ease 0.5s both;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animated"></div>
+    <div class="grid-overlay"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="login-wrapper">
+
+        <div class="login-logos">
+            <img src="/images/logo_aude.png" alt="Département de l'Aude">
+        </div>
+
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-icon">🔐</div>
+                <h1>Interface d'Administration</h1>
+                <p>Connectez-vous avec vos identifiants<br>Active Directory du collège</p>
+            </div>
+
+            <div class="error-msg" id="errorMsg"></div>
+
+            <div class="form-group">
+                <label class="form-label">Identifiant</label>
+                <div class="input-wrapper">
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="username"
+                        placeholder="prenom.nom"
+                        autocomplete="username"
+                    >
+                    <span class="input-icon">👤</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Mot de passe</label>
+                <div class="input-wrapper">
+                    <input
+                        type="password"
+                        class="form-control"
+                        id="password"
+                        autocomplete="current-password"
+                    >
+                    <span class="input-icon">🔑</span>
+                </div>
+            </div>
+
+            <button class="btn-login" onclick="login()" id="loginBtn">
+                <div class="spinner"></div>
+                <span class="btn-text">Se connecter</span>
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') login();
+        });
+
+        async function login() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('errorMsg');
+            const loginBtn = document.getElementById('loginBtn');
+
+            if (!username || !password) {
+                showError("Veuillez remplir tous les champs.");
+                return;
+            }
+
+            loginBtn.classList.add('loading');
+            loginBtn.disabled = true;
+            errorMsg.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, deviceId: 'WEB-ADMIN' })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.role === 'ADMIN') {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('displayName', data.displayName);
+                    window.location.href = '/dashboard';
+                } else if (data.success && data.role !== 'ADMIN') {
+                    showError("Accès refusé. Cette interface est réservée aux administrateurs.");
+                } else {
+                    showError(data.message || "Identifiants incorrects.");
+                }
+            } catch (e) {
+                showError("Erreur de connexion au serveur.");
+            } finally {
+                loginBtn.classList.remove('loading');
+                loginBtn.disabled = false;
+            }
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.textContent = msg;
+            el.style.display = 'block';
+            el.style.animation = 'none';
+            el.offsetHeight;
+            el.style.animation = 'shake 0.4s ease';
+        }
+    </script>
+</body>
+</html>

@@ -24,12 +24,17 @@ function isValidPackageName(packageName) {
     return regex.test(packageName);
 }
 
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pages', 'login.html'));
+});
+
+app.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pages', 'dashboard.html'));
+});
+
+// Redirige la racine vers le dashboard
 app.get('/', (req, res) => {
-    res.status(200).json({
-        status: "success",
-        message: "API Fonctionnelle",
-        timestamp: new Date().toISOString()
-    });
+    res.redirect('/dashboard');
 });
 
 // ROUTE : Connexion depuis la tablette
