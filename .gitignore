@@ -1,5 +1,6 @@
 *.apk
 *.png
 *.sqlite
+*.exe
 node_modules/
 logs/
