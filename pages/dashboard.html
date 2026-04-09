@@ -792,6 +792,7 @@
                         <h3>Applications autorisées</h3>
                         <p>Ces applications sont disponibles sur toutes les tablettes</p>
                     </div>
+                    <button class="btn btn-primary" onclick="openModalAddApp()">➕ Ajouter une application</button>
                 </div>
                 <div style="padding: 20px;">
                     <div class="apps-grid" id="appsGrid">
@@ -1124,6 +1125,203 @@ async function loadDevices() {
         const activePage = document.querySelector('.page.active').id;
         if (activePage === 'page-tablettes') loadDevices();
     }, 30000);
+let tmpApkName = null;
+let selectedIconFile = null;
+
+function openModalAddApp() {
+    document.getElementById('addAppName').value = '';
+    document.getElementById('addAppPackage').value = '';
+    document.getElementById('addAppFile').value = '';
+    document.getElementById('uploadProgress').style.display = 'none';
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('stepUpload').style.display = 'block';
+    document.getElementById('stepIcon').style.display = 'none';
+    tmpApkName = null;
+    selectedIconFile = null;
+    document.getElementById('modalAddApp').classList.add('open');
+}
+
+function backToUpload() {
+    document.getElementById('stepUpload').style.display = 'block';
+    document.getElementById('stepIcon').style.display = 'none';
+}
+
+async function uploadApkPreview() {
+    const appName = document.getElementById('addAppName').value.trim();
+    const packageName = document.getElementById('addAppPackage').value.trim();
+    const file = document.getElementById('addAppFile').files[0];
+
+    if (!appName || !packageName || !file) {
+        showToast('Veuillez remplir tous les champs', 'error');
+        return;
+    }
+
+    document.getElementById('btnUpload').disabled = true;
+    document.getElementById('uploadProgress').style.display = 'block';
+
+    const formData = new FormData();
+    formData.append('apk', file);
+
+    try {
+        const result = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    document.getElementById('progressBar').style.width = `${pct}%`;
+                    document.getElementById('progressPercent').textContent = `${pct}%`;
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(JSON.parse(xhr.responseText));
+                } else {
+                    reject(new Error('Erreur upload'));
+                }
+            });
+
+            xhr.addEventListener('error', () => reject(new Error('Erreur réseau')));
+            xhr.open('POST', '/api/apps/web/preview');
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            xhr.send(formData);
+        });
+
+        tmpApkName = result.tmpApk;
+
+        // Affiche les icônes
+        const grid = document.getElementById('iconGrid');
+        grid.innerHTML = result.icons.map((icon, i) => `
+            <div onclick="selectIcon('${icon.tmpFile}', this)" style="
+                cursor: pointer;
+                border: 2px solid #E5E7EB;
+                border-radius: 10px;
+                padding: 8px;
+                text-align: center;
+                transition: all 0.2s;
+            ">
+                <img src="${icon.url}" style="width:50px;height:50px;object-fit:contain;border-radius:8px;" 
+                     onerror="this.parentElement.style.display='none'">
+                <div style="font-size:9px;color:#9CA3AF;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                    ${icon.path.split('/').pop()}
+                </div>
+            </div>
+        `).join('');
+
+        document.getElementById('stepUpload').style.display = 'none';
+        document.getElementById('stepIcon').style.display = 'block';
+
+    } catch (e) {
+        showToast('Erreur lors de l\'upload', 'error');
+        console.error(e);
+    } finally {
+        document.getElementById('btnUpload').disabled = false;
+    }
+}
+
+function selectIcon(tmpFile, el) {
+    // Déselectionne tout
+    document.querySelectorAll('#iconGrid > div').forEach(d => {
+        d.style.borderColor = '#E5E7EB';
+        d.style.background = 'white';
+    });
+
+    // Sélectionne celui cliqué
+    el.style.borderColor = '#003189';
+    el.style.background = '#EEF2FF';
+    selectedIconFile = tmpFile;
+    document.getElementById('btnConfirm').disabled = false;
+}
+
+async function confirmAddApp() {
+    const appName = document.getElementById('addAppName').value.trim();
+    const packageName = document.getElementById('addAppPackage').value.trim();
+
+    document.getElementById('btnConfirm').disabled = true;
+
+    try {
+        const res = await api('POST', '/api/apps/web/confirm', {
+            appName,
+            packageName,
+            tmpApk: tmpApkName,
+            selectedIcon: selectedIconFile
+        });
+
+        if (res?.success) {
+            closeModal('modalAddApp');
+            showToast(`✅ ${appName} ajoutée avec succès`, 'success');
+            loadApps();
+        } else {
+            showToast(res?.error || 'Erreur', 'error');
+        }
+    } catch (e) {
+        showToast('Erreur', 'error');
+    } finally {
+        document.getElementById('btnConfirm').disabled = false;
+    }
+}
 </script>
+
+<!-- MODAL AJOUT APP -->
+<div class="modal-overlay" id="modalAddApp">
+    <div class="modal" style="max-width: 600px;">
+        <h3>➕ Ajouter une application</h3>
+        <p>Uploadez un APK — choisissez ensuite l'icône à utiliser.</p>
+
+        <!-- ÉTAPE 1 -->
+        <div id="stepUpload">
+            <div class="form-group">
+                <label class="form-label">Nom de l'application</label>
+                <input type="text" class="form-control" id="addAppName" placeholder="Ex: Scratch">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nom du package</label>
+                <input type="text" class="form-control" id="addAppPackage" placeholder="Ex: org.scratch">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Fichier APK</label>
+                <input type="file" class="form-control" id="addAppFile" accept=".apk">
+            </div>
+
+            <div id="uploadProgress" style="display:none;margin-bottom:15px;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:#6B7280;margin-bottom:6px;">
+                    <span>Upload en cours...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div style="background:#E5E7EB;border-radius:99px;height:6px;overflow:hidden;">
+                    <div id="progressBar" style="height:100%;background:linear-gradient(90deg,#003189,#4A7FE5);border-radius:99px;width:0%;transition:width 0.3s;"></div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="closeModal('modalAddApp')">Annuler</button>
+                <button class="btn btn-primary" onclick="uploadApkPreview()" id="btnUpload">Suivant →</button>
+            </div>
+        </div>
+
+        <!-- ÉTAPE 2 : Sélection icône -->
+        <div id="stepIcon" style="display:none;">
+            <p style="font-size:13px;color:#6B7280;margin-bottom:15px;">
+                Sélectionnez l'icône à utiliser pour cette application :
+            </p>
+            <div id="iconGrid" style="
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+                gap: 10px;
+                max-height: 300px;
+                overflow-y: auto;
+                padding: 5px;
+                margin-bottom: 20px;
+            "></div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="backToUpload()">← Retour</button>
+                <button class="btn btn-primary" onclick="confirmAddApp()" id="btnConfirm" disabled>
+                    ✅ Confirmer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
