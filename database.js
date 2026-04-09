@@ -26,6 +26,24 @@ db.serialize(() => {
         package TEXT UNIQUE
     )`);
 
+    // Blacklist des tablettes
+    db.run(`CREATE TABLE IF NOT EXISTS devices_blacklist (
+        device_id TEXT PRIMARY KEY,
+        reason TEXT,
+        blocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        blocked_by TEXT
+    )`);
+
+    // Apps installées par tablette
+    db.run(`CREATE TABLE IF NOT EXISTS device_apps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id TEXT,
+        package_name TEXT,
+        app_name TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(device_id, package_name)
+    )`);
+
     console.log("✅ Base de données SQLite prête.");
 });
 
