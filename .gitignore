@@ -1,5 +1,5 @@
 *.apk
-*.png
+uploads/*.png
 *.sqlite
 *.exe
 node_modules/
