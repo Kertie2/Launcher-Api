@@ -1,11 +1,12 @@
 const express = require('express');
 const { checkUser } = require('./auth-ad');
-const db = require('./database'); // Ton fichier SQLite
+const db = require('./database');
 const app = express();
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/apks/' }); // Dossier temporaire pour les APK
+const upload = multer({ dest: 'uploads/apks/' });
+const { generateToken, requireAuth, requireAdmin } = require('./middleware/auth');
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -17,6 +18,11 @@ app.use(express.static('public'));
 // Créer le dossier s'il n'existe pas
 if (!fs.existsSync('./uploads')) fs.mkdirSync('./uploads');
 if (!fs.existsSync('./uploads/apks')) fs.mkdirSync('./uploads/apks', { recursive: true });
+
+function isValidPackageName(packageName) {
+    const regex = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+    return regex.test(packageName);
+}
 
 app.get('/', (req, res) => {
     res.status(200).json({
@@ -32,26 +38,23 @@ app.post('/api/login', async (req, res) => {
 
     console.log(`📡 Tentative de connexion : ${username} sur ${deviceId}`);
 
-    // 1. Vérification AD
     const authResult = await checkUser(username, password);
 
     if (authResult.success) {
-        // 2. Log de la connexion dans SQLite
         db.run("INSERT INTO connection_logs (username, device_id) VALUES (?, ?)", 
                [username, deviceId]);
-
-        // 3. Mise à jour de la tablette (on associe le dernier utilisateur)
         db.run("UPDATE devices SET assigned_user = ? WHERE device_id = ?", 
                [authResult.displayName, deviceId]);
 
+        const token = generateToken(authResult); // <- nouveau
         console.log(`✅ ${authResult.displayName} (${authResult.role}) connecté !`);
-        res.json(authResult);
+        res.json({ ...authResult, token }); // <- on ajoute le token à la réponse
     } else {
         res.status(401).json(authResult);
     }
 });
 
-app.get('/api/apps', (req, res) => {
+app.get('/api/apps', requireAuth, (req, res) => {
     // Utilisation de "package as packageName" pour correspondre à ton code Flutter
     db.all("SELECT id, appName, package as packageName FROM apps", [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -60,12 +63,16 @@ app.get('/api/apps', (req, res) => {
 });
 
 // 3. ROUTE FUSIONNÉE : Ajouter une app avec gestion d'icône
-app.post('/api/apps', upload.single('apk'), (req, res) => {
+app.post('/api/apps', requireAuth, requireAdmin, upload.single('apk'), (req, res) => {
     const { appName, package, iconBase64 } = req.body;
     const apkFile = req.file;
 
     if (!appName || !package || !apkFile) {
         return res.status(400).json({ error: "Données ou APK manquants" });
+    }
+
+    if (!isValidPackageName(packageName)) {
+        return res.status(400).json({ error: "Nom de package invalide" });
     }
 
     // 1. Sauvegarde de l'icône (existant)
@@ -91,7 +98,7 @@ app.post('/api/apps', upload.single('apk'), (req, res) => {
 });
 
 // 4. Supprimer une app
-app.delete('/api/apps/:id', (req, res) => {
+app.delete('/api/apps/:id', requireAuth, requireAdmin, (req, res) => {
     const id = req.params.id;
     db.run("DELETE FROM apps WHERE id = ?", id, function(err) {
         if (err) return res.status(500).json({ error: err.message });
