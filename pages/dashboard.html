@@ -994,10 +994,22 @@ async function loadDevices() {
                         ? `<button class="btn btn-success" onclick="openUnblock('${d.device_id}')">✅ Débloquer</button>`
                         : `<button class="btn btn-danger" onclick="openBlacklist('${d.device_id}')">🚫 Bloquer</button>`
                     }
+                    <button class="btn btn-ghost" onclick="deleteDevice('${d.device_id}')">🗑 Supprimer</button>
                 </div>
             </div>
         `;
     }).join('');
+}
+
+async function deleteDevice(deviceId) {
+    if (!confirm(`Supprimer définitivement la tablette "${deviceId}" ? Cette action est irréversible.`)) return;
+    const res = await api('DELETE', `/api/devices/${deviceId}`);
+    if (res?.success) {
+        showToast(`Tablette ${deviceId} supprimée`, 'success');
+        loadDevices();
+    } else {
+        showToast('Erreur lors de la suppression', 'error');
+    }
 }
     // --- BLACKLIST ---
     function openBlacklist(deviceId) {

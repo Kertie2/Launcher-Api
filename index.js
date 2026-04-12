@@ -125,6 +125,18 @@ app.post('/api/apps', requireAuth, requireAdmin, upload.single('apk'), (req, res
     });
 });
 
+app.delete('/api/devices/:deviceId', requireAuth, requireAdmin, (req, res) => {
+    const { deviceId } = req.params;
+    db.run("DELETE FROM devices WHERE device_id = ?", [deviceId], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        // Nettoie aussi les apps et la blacklist associées
+        db.run("DELETE FROM device_apps WHERE device_id = ?", [deviceId]);
+        db.run("DELETE FROM devices_blacklist WHERE device_id = ?", [deviceId]);
+        console.log(`🗑️ Tablette supprimée : ${deviceId}`);
+        res.json({ success: true });
+    });
+});
+
 app.post('/api/devices/logout', requireAuth, (req, res) => {
     const { deviceId } = req.body;
     if (!deviceId) return res.status(400).json({ error: "deviceId manquant" });
