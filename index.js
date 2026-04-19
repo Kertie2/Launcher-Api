@@ -9,6 +9,7 @@ const upload = multer({ dest: 'uploads/apks/' });
 const { generateToken, requireAuth, requireAdmin } = require('./middleware/auth');
 const ApkReader = require('adbkit-apkreader');
 const uploadWeb = multer({ dest: 'uploads/tmp/' });
+const https = require('https');
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -69,39 +70,86 @@ app.get('/api/apps', requireAuth, (req, res) => {
     });
 });
 
-// 3. ROUTE FUSIONNÉE : Ajouter une app avec gestion d'icône
 app.post('/api/apps', requireAuth, requireAdmin, upload.single('apk'), (req, res) => {
-    const { appName, package, iconBase64 } = req.body;
+    console.log("📥 [POST /api/apps] Requête reçue");
+    console.log("📋 Headers:", req.headers['authorization'] ? "Token présent" : "❌ Pas de token");
+    console.log("📋 Body fields:", { appName: req.body.appName, package: req.body.package, iconBase64: req.body.iconBase64 ? "présent" : "absent" });
+    console.log("📁 Fichier APK:", req.file ? `${req.file.originalname} (${req.file.size} bytes)` : "❌ Absent");
+
+    const { appName, package: packageName, iconBase64 } = req.body;
     const apkFile = req.file;
 
-    if (!appName || !package || !apkFile) {
+    if (!appName || !packageName || !apkFile) {
+        console.log("❌ Données manquantes:", { appName: !!appName, packageName: !!packageName, apkFile: !!apkFile });
         return res.status(400).json({ error: "Données ou APK manquants" });
     }
 
+    console.log("✅ Données présentes:", { appName, packageName });
+
     if (!isValidPackageName(packageName)) {
+        console.log("❌ Package name invalide:", packageName);
         return res.status(400).json({ error: "Nom de package invalide" });
     }
 
-    // 1. Sauvegarde de l'icône (existant)
+    console.log("✅ Package name valide:", packageName);
+
     if (iconBase64) {
-        const iconPath = path.join(__dirname, 'uploads', `${package}.png`);
-        const base64Data = iconBase64.replace(/^data:image\/png;base64,/, "");
-        fs.writeFileSync(iconPath, Buffer.from(base64Data, 'base64'));
+        try {
+            const iconPath = path.join(__dirname, 'uploads', `${packageName}.png`);
+            const base64Data = iconBase64.replace(/^data:image\/png;base64,/, "");
+            fs.writeFileSync(iconPath, Buffer.from(base64Data, 'base64'));
+            console.log("✅ Icône sauvegardée:", iconPath);
+        } catch (e) {
+            console.error("❌ Erreur sauvegarde icône:", e.message);
+        }
+    } else {
+        console.log("⚠️ Pas d'icône fournie");
     }
 
-    // 2. Déplacement de l'APK vers son nom définitif
-    const finalApkPath = path.join(__dirname, 'uploads/apks', `${package}.apk`);
-    fs.renameSync(apkFile.path, finalApkPath);
+    try {
+        const finalApkPath = path.join(__dirname, 'uploads/apks', `${packageName}.apk`);
+        fs.renameSync(apkFile.path, finalApkPath);
+        console.log("✅ APK déplacé vers:", finalApkPath);
+    } catch (e) {
+        console.error("❌ Erreur déplacement APK:", e.message);
+        return res.status(500).json({ error: "Erreur lors du déplacement de l'APK" });
+    }
 
-    // 3. Insertion en BDD
-    db.run("INSERT OR REPLACE INTO apps (appName, package) VALUES (?, ?)", [appName, package], function(err) {
+    db.run("INSERT OR REPLACE INTO apps (appName, package) VALUES (?, ?)", [appName, packageName], function(err) {
         if (err) {
             console.error("❌ Erreur BDD:", err.message);
-            return res.status(400).json({ error: "L'application existe déjà" });
+            return res.status(400).json({ error: err.message });
         }
-        console.log(`📦 APK et Icône reçus pour : ${appName} (${package})`);
+        console.log(`✅ App insérée en BDD : ${appName} (${packageName}) — ID: ${this.lastID}`);
         res.json({ id: this.lastID, success: true });
     });
+});
+
+app.delete('/api/devices/:deviceId', requireAuth, requireAdmin, (req, res) => {
+    const { deviceId } = req.params;
+    db.run("DELETE FROM devices WHERE device_id = ?", [deviceId], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        // Nettoie aussi les apps et la blacklist associées
+        db.run("DELETE FROM device_apps WHERE device_id = ?", [deviceId]);
+        db.run("DELETE FROM devices_blacklist WHERE device_id = ?", [deviceId]);
+        console.log(`🗑️ Tablette supprimée : ${deviceId}`);
+        res.json({ success: true });
+    });
+});
+
+app.post('/api/devices/logout', requireAuth, (req, res) => {
+    const { deviceId } = req.body;
+    if (!deviceId) return res.status(400).json({ error: "deviceId manquant" });
+
+    db.run(
+        "UPDATE devices SET adb_status = 'Disconnected', assigned_user = NULL WHERE device_id = ?",
+        [deviceId],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            console.log(`📴 Tablette déconnectée : ${deviceId}`);
+            res.json({ success: true });
+        }
+    );
 });
 
 // 4. Supprimer une app
@@ -320,6 +368,33 @@ app.post('/api/apps/web/confirm', requireAuth, requireAdmin, (req, res) => {
             res.json({ success: true, id: this.lastID });
         }
     );
+});
+
+app.get('/api/launcher/latest', requireAuth, async (req, res) => {
+    try {
+        const options = {
+            hostname: 'api.github.com',
+            path: '/repos/Kertie2/Launcher-App/releases/latest',
+            headers: { 'User-Agent': 'Launcher-MDM' }
+        };
+
+        const data = await new Promise((resolve, reject) => {
+            https.get(options, (response) => {
+                let body = '';
+                response.on('data', chunk => body += chunk);
+                response.on('end', () => resolve(JSON.parse(body)));
+            }).on('error', reject);
+        });
+
+        res.json({
+            version: data.tag_name,         // ex: "v1.0.10"
+            downloadUrl: data.assets?.[0]?.browser_download_url,
+            publishedAt: data.published_at,
+            name: data.name
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 setInterval(() => {
