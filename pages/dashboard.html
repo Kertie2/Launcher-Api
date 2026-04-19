@@ -1057,6 +1057,64 @@ async function loadDevices() {
         `;
     }).join('');
 }
+
+function openModalBlockUser() {
+    document.getElementById('blockUsername').value = '';
+    document.getElementById('blockReason').value = '';
+    document.getElementById('modalBlockUser').classList.add('open');
+}
+
+async function confirmBlockUser() {
+    const username = document.getElementById('blockUsername').value.trim();
+    const reason = document.getElementById('blockReason').value.trim();
+    if (!username) { showToast('Identifiant manquant', 'error'); return; }
+
+    await api('POST', '/api/users/blacklist', { username, reason });
+    closeModal('modalBlockUser');
+    showToast(`Compte ${username} bloqué`, 'success');
+    loadUsersBlacklist();
+}
+
+async function loadUsersBlacklist() {
+    const body = document.getElementById('usersBlacklistBody');
+    body.innerHTML = '<tr><td colspan="5" class="loading-state"><div class="spinner"></div></td></tr>';
+
+    const users = await api('GET', '/api/users/blacklist');
+    if (!users || users.length === 0) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:#6B7280">Aucun compte bloqué</td></tr>';
+        return;
+    }
+
+    body.innerHTML = users.map(u => `
+        <tr>
+            <td><strong>${u.username}</strong></td>
+            <td>${u.reason || '—'}</td>
+            <td>${u.blocked_by || '—'}</td>
+            <td>${new Date(u.blocked_at).toLocaleString('fr-FR')}</td>
+            <td>
+                <button class="btn btn-success" onclick="unblockUser('${u.username}')">✅ Débloquer</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function unblockUser(username) {
+    if (!confirm(`Débloquer le compte "${username}" ?`)) return;
+    await api('DELETE', `/api/users/blacklist/${username}`);
+    showToast(`Compte ${username} débloqué`, 'success');
+    loadUsersBlacklist();
+}
+
+async function deleteDevice(deviceId) {
+    if (!confirm(`Supprimer définitivement la tablette "${deviceId}" ? Cette action est irréversible.`)) return;
+    const res = await api('DELETE', `/api/devices/${deviceId}`);
+    if (res?.success) {
+        showToast(`Tablette ${deviceId} supprimée`, 'success');
+        loadDevices();
+    } else {
+        showToast('Erreur lors de la suppression', 'error');
+    }
+}
     // --- BLACKLIST ---
     function openBlacklist(deviceId) {
         currentBlacklistDevice = deviceId;
