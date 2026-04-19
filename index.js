@@ -40,28 +40,6 @@ app.get('/', (req, res) => {
     res.redirect('/dashboard');
 });
 
-// ROUTE : Connexion depuis la tablette
-app.post('/api/login', async (req, res) => {
-    const { username, password, deviceId } = req.body;
-
-    console.log(`📡 Tentative de connexion : ${username} sur ${deviceId}`);
-
-    const authResult = await checkUser(username, password);
-
-    if (authResult.success) {
-        db.run("INSERT INTO connection_logs (username, device_id) VALUES (?, ?)", 
-               [username, deviceId]);
-        db.run("UPDATE devices SET assigned_user = ? WHERE device_id = ?", 
-               [authResult.displayName, deviceId]);
-
-        const token = generateToken(authResult); // <- nouveau
-        console.log(`✅ ${authResult.displayName} (${authResult.role}) connecté !`);
-        res.json({ ...authResult, token }); // <- on ajoute le token à la réponse
-    } else {
-        res.status(401).json(authResult);
-    }
-});
-
 app.get('/api/apps', requireAuth, (req, res) => {
     // Utilisation de "package as packageName" pour correspondre à ton code Flutter
     db.all("SELECT id, appName, package as packageName FROM apps", [], (err, rows) => {
@@ -397,6 +375,67 @@ app.get('/api/launcher/latest', requireAuth, async (req, res) => {
     }
 });
 
+app.post('/api/login', async (req, res) => {
+    const { username, password, deviceId } = req.body;
+    console.log(`📡 Tentative de connexion : ${username} sur ${deviceId}`);
+
+    const authResult = await checkUser(username, password);
+
+    if (authResult.success) {
+        // Vérifie si le compte est blacklisté
+        db.get("SELECT * FROM users_blacklist WHERE username = ?", [username], (err, row) => {
+            if (row) {
+                console.log(`🚫 Compte bloqué : ${username}`);
+                return res.status(403).json({
+                    success: false,
+                    message: `Votre compte a été bloqué. Raison : ${row.reason || 'Non précisée'}`
+                });
+            }
+
+            db.run("INSERT INTO connection_logs (username, device_id) VALUES (?, ?)", [username, deviceId]);
+            db.run("UPDATE devices SET assigned_user = ? WHERE device_id = ?", [authResult.displayName, deviceId]);
+
+            const token = generateToken(authResult);
+            console.log(`✅ ${authResult.displayName} (${authResult.role}) connecté !`);
+            res.json({ ...authResult, token });
+        });
+    } else {
+        res.status(401).json(authResult);
+    }
+});
+
+// Lister les comptes bloqués
+app.get('/api/users/blacklist', requireAuth, requireAdmin, (req, res) => {
+    db.all("SELECT * FROM users_blacklist ORDER BY blocked_at DESC", [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+// Bloquer un compte
+app.post('/api/users/blacklist', requireAuth, requireAdmin, (req, res) => {
+    const { username, reason } = req.body;
+    if (!username) return res.status(400).json({ error: "username manquant" });
+
+    db.run(
+        "INSERT OR REPLACE INTO users_blacklist (username, reason, blocked_by) VALUES (?, ?, ?)",
+        [username, reason || "Aucune raison", req.user.username],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            console.log(`🚫 Compte bloqué : ${username}`);
+            res.json({ success: true });
+        }
+    );
+});
+
+// Débloquer un compte
+app.delete('/api/users/blacklist/:username', requireAuth, requireAdmin, (req, res) => {
+    db.run("DELETE FROM users_blacklist WHERE username = ?", [req.params.username], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
 setInterval(() => {
     db.run(`
         UPDATE devices 
@@ -407,7 +446,7 @@ setInterval(() => {
         if (err) console.error("Erreur heartbeat check:", err.message);
         else console.log("🔄 Check heartbeat effectué");
     });
-}, 60000);
+}, 30000);
 
 app.listen(3000, '0.0.0.0', () => {
     console.log("🚀 Serveur actif sur le port 3000");
