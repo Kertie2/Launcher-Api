@@ -44,6 +44,14 @@ db.serialize(() => {
         UNIQUE(device_id, package_name)
     )`);
 
+    db.run(`CREATE TABLE IF NOT EXISTS users_blacklist (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE,
+        reason TEXT,
+        blocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        blocked_by TEXT
+    )`);
+
     console.log("✅ Base de données SQLite prête.");
 });
 
