@@ -375,7 +375,6 @@ app.get('/api/launcher/latest', requireAuth, async (req, res) => {
     }
 });
 
-<<<<<<< HEAD
 app.post('/api/login', async (req, res) => {
     const { username, password, deviceId } = req.body;
     console.log(`📡 Tentative de connexion : ${username} sur ${deviceId}`);
@@ -437,8 +436,6 @@ app.delete('/api/users/blacklist/:username', requireAuth, requireAdmin, (req, re
     });
 });
 
-=======
->>>>>>> d3cdb09ac80d6702233a705ad04da8cbb2e589d3
 setInterval(() => {
     db.run(`
         UPDATE devices 
