@@ -7,9 +7,58 @@ const path = require('path');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/apks/' });
 const { generateToken, requireAuth, requireAdmin } = require('./middleware/auth');
-const ApkReader = require('adbkit-apkreader');
+const gplay = require('google-play-scraper');
+const AdmZip = require('adm-zip');
 const uploadWeb = multer({ dest: 'uploads/tmp/' });
 const https = require('https');
+
+
+const { exec } = require('child_process');
+
+// Dossier de backup
+if (!fs.existsSync('./backups')) fs.mkdirSync('./backups');
+
+function runBackup() {
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const backupPath = `./backups/bdd_stex_${timestamp}.sqlite`;
+
+    // Copie simple du fichier SQLite
+    fs.copyFile('./bdd_stex.sqlite', backupPath, (err) => {
+        if (err) {
+            console.error("❌ Erreur backup BDD:", err.message);
+            return;
+        }
+        console.log(`✅ Backup BDD créé : ${backupPath}`);
+        cleanOldBackups();
+    });
+}
+
+function cleanOldBackups() {
+    // Garde seulement les 10 derniers backups
+    const files = fs.readdirSync('./backups')
+        .filter(f => f.endsWith('.sqlite'))
+        .map(f => ({
+            name: f,
+            time: fs.statSync(`./backups/${f}`).mtime.getTime()
+        }))
+        .sort((a, b) => b.time - a.time); // Plus récent en premier
+
+    if (files.length > 10) {
+        const toDelete = files.slice(10);
+        toDelete.forEach(f => {
+            fs.unlink(`./backups/${f.name}`, (err) => {
+                if (!err) console.log(`🗑️ Ancien backup supprimé : ${f.name}`);
+            });
+        });
+    }
+}
+
+// Backup au démarrage du serveur
+runBackup();
+
+// Backup toutes les 6 heures
+setInterval(runBackup, 6 * 60 * 60 * 1000);
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -27,6 +76,80 @@ function isValidPackageName(packageName) {
     return regex.test(packageName);
 }
 
+// Helper log
+function logActivity(username, deviceId, eventType, details = {}, ip = null) {
+    db.run(
+        "INSERT INTO activity_logs (username, device_id, event_type, details, ip) VALUES (?, ?, ?, ?, ?)",
+        [username, deviceId, eventType, JSON.stringify(details), ip],
+        (err) => { if (err) console.error("❌ Erreur log:", err.message); }
+    );
+}
+
+// Helper : extrait le package name et la version depuis l'APK
+async function extractApkInfo(apkPath) {
+    try {
+        const zip = new AdmZip(apkPath);
+        const manifestEntry = zip.getEntry('AndroidManifest.xml');
+        if (!manifestEntry) throw new Error('AndroidManifest.xml introuvable');
+
+        // Parse binaire du manifest Android
+        const manifestBuffer = manifestEntry.getData();
+        const result = parseAndroidManifest(manifestBuffer);
+        return result;
+    } catch (e) {
+        console.error('❌ Erreur extraction APK info:', e.message);
+        return null;
+    }
+}
+
+// Parser minimal du AndroidManifest.xml binaire
+function parseAndroidManifest(buffer) {
+    try {
+        // Cherche le package name et versionName dans le binaire
+        const str = buffer.toString('utf8');
+        const latin = buffer.toString('latin1');
+
+        // Extraction via regex sur les strings du binaire
+        const packageMatch = latin.match(/([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+)/g);
+        const versionMatch = latin.match(/versionName[\x00-\x1f]+([0-9][^\x00-\x1f]{0,20})/);
+
+        // Filtre pour trouver le vrai package (pas les imports android.*)
+        const packageName = packageMatch?.find(p =>
+            !p.startsWith('android.') &&
+            !p.startsWith('com.android.') &&
+            !p.startsWith('dalvik.') &&
+            !p.startsWith('java.') &&
+            p.includes('.') &&
+            p.length > 5
+        );
+
+        const version = versionMatch?.[1]?.replace(/[^\x20-\x7E]/g, '').trim();
+
+        return { packageName, version };
+    } catch (e) {
+        return { packageName: null, version: null };
+    }
+}
+
+// Helper : récupère les infos Play Store
+async function getPlayStoreInfo(packageName) {
+    try {
+        const result = await gplay.app({
+            appId: packageName,
+            lang: 'fr',
+            country: 'fr'
+        });
+        return {
+            version: result.version,
+            icon: result.icon,
+            title: result.title
+        };
+    } catch (e) {
+        console.log(`⚠️ App ${packageName} non trouvée sur Play Store`);
+        return null;
+    }
+}
+
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'pages', 'login.html'));
 });
@@ -38,14 +161,6 @@ app.get('/dashboard', (req, res) => {
 // Redirige la racine vers le dashboard
 app.get('/', (req, res) => {
     res.redirect('/dashboard');
-});
-
-app.get('/api/apps', requireAuth, (req, res) => {
-    // Utilisation de "package as packageName" pour correspondre à ton code Flutter
-    db.all("SELECT id, appName, package as packageName FROM apps", [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
 });
 
 app.post('/api/apps', requireAuth, requireAdmin, upload.single('apk'), (req, res) => {
@@ -115,9 +230,55 @@ app.delete('/api/devices/:deviceId', requireAuth, requireAdmin, (req, res) => {
     });
 });
 
+// Lister les backups disponibles
+app.get('/api/backups', requireAuth, requireAdmin, (req, res) => {
+    const files = fs.readdirSync('./backups')
+        .filter(f => f.endsWith('.sqlite'))
+        .map(f => {
+            const stats = fs.statSync(`./backups/${f}`);
+            return {
+                name: f,
+                size: stats.size,
+                createdAt: stats.mtime
+            };
+        })
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json(files);
+});
+
+// Télécharger un backup
+app.get('/api/backups/:filename', requireAuth, requireAdmin, (req, res) => {
+    const filename = req.params.filename;
+
+    // Sécurité : empêche les path traversal
+    if (filename.includes('/') || filename.includes('..') || !filename.endsWith('.sqlite')) {
+        return res.status(400).json({ error: "Fichier invalide" });
+    }
+
+    const filePath = path.join(__dirname, 'backups', filename);
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "Backup introuvable" });
+    }
+
+    res.download(filePath, filename);
+});
+
+// Forcer un backup manuel
+app.post('/api/backups', requireAuth, requireAdmin, (req, res) => {
+    try {
+        runBackup();
+        res.json({ success: true, message: "Backup lancé" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post('/api/devices/logout', requireAuth, (req, res) => {
     const { deviceId } = req.body;
     if (!deviceId) return res.status(400).json({ error: "deviceId manquant" });
+
+    logActivity(req.user.username, deviceId, 'logout', {}, req.ip);
 
     db.run(
         "UPDATE devices SET adb_status = 'Disconnected', assigned_user = NULL WHERE device_id = ?",
@@ -125,6 +286,122 @@ app.post('/api/devices/logout', requireAuth, (req, res) => {
         (err) => {
             if (err) return res.status(500).json({ error: err.message });
             console.log(`📴 Tablette déconnectée : ${deviceId}`);
+            res.json({ success: true });
+        }
+    );
+});
+
+app.post('/api/logs/app', requireAuth, (req, res) => {
+    const { deviceId, packageName, appName, action } = req.body;
+    if (!deviceId || !packageName || !action) {
+        return res.status(400).json({ error: "Données manquantes" });
+    }
+
+    logActivity(req.user.username, deviceId, `app_${action}`, {
+        packageName,
+        appName
+    }, req.ip);
+
+    // Garde aussi dans app_usage_logs pour l'historique élève
+    db.run(
+        "INSERT INTO app_usage_logs (username, device_id, package_name, app_name, action) VALUES (?, ?, ?, ?, ?)",
+        [req.user.username, deviceId, packageName, appName, action],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
+});
+
+app.get('/api/logs/activity', requireAuth, requireAdmin, (req, res) => {
+    const { username, event_type, device_id, limit = 100 } = req.query;
+
+    let query = "SELECT * FROM activity_logs WHERE 1=1";
+    const params = [];
+
+    if (username) { query += " AND username = ?"; params.push(username); }
+    if (event_type) { query += " AND event_type = ?"; params.push(event_type); }
+    if (device_id) { query += " AND device_id = ?"; params.push(device_id); }
+
+    query += " ORDER BY timestamp DESC LIMIT ?";
+    params.push(parseInt(limit));
+
+    db.all(query, params, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        // Parse le JSON des détails
+        const parsed = rows.map(r => ({
+            ...r,
+            details: r.details ? JSON.parse(r.details) : {}
+        }));
+        res.json(parsed);
+    });
+});
+
+// Récupérer l'historique — filtrable par utilisateur
+app.get('/api/logs/apps', requireAuth, requireAdmin, (req, res) => {
+    const { username } = req.query;
+    const query = username
+        ? "SELECT * FROM app_usage_logs WHERE username = ? ORDER BY timestamp DESC LIMIT 200"
+        : "SELECT * FROM app_usage_logs ORDER BY timestamp DESC LIMIT 200";
+    const params = username ? [username] : [];
+
+    db.all(query, params, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+// Envoyer une notification
+app.post('/api/notifications', requireAuth, requireAdmin, (req, res) => {
+    const { message, deviceId } = req.body;
+    if (!message) return res.status(400).json({ error: "Message manquant" });
+
+    db.run(
+        "INSERT INTO notifications (target_device_id, message, created_by) VALUES (?, ?, ?)",
+        [deviceId || null, message, req.user.username],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            console.log(`📢 Notification envoyée : "${message}" -> ${deviceId || 'toutes les tablettes'}`);
+            res.json({ success: true, id: this.lastID });
+        }
+    );
+});
+
+// Récupérer les notifications en attente pour une tablette
+app.get('/api/notifications/pending', requireAuth, (req, res) => {
+    const { deviceId } = req.query;
+    if (!deviceId) return res.status(400).json({ error: "deviceId manquant" });
+
+    db.all(
+        `SELECT * FROM notifications 
+         WHERE is_read = 0 
+         AND (target_device_id = ? OR target_device_id IS NULL)
+         ORDER BY created_at DESC`,
+        [deviceId],
+        (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(rows);
+        }
+    );
+});
+
+// Marquer une notification comme lue
+app.post('/api/notifications/:id/read', requireAuth, (req, res) => {
+    db.run("UPDATE notifications SET is_read = 1 WHERE id = ?", [req.params.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+// Forcer l'ouverture du launcher sur une tablette
+app.post('/api/devices/:deviceId/force-open', requireAuth, requireAdmin, (req, res) => {
+    const { deviceId } = req.params;
+    // On envoie une notification spéciale de type "force_open"
+    db.run(
+        "INSERT INTO notifications (target_device_id, message, created_by) VALUES (?, ?, ?)",
+        [deviceId, '__FORCE_OPEN__', req.user.username],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true });
         }
     );
@@ -251,65 +528,97 @@ app.get('/api/logs', requireAuth, requireAdmin, (req, res) => {
     );
 });
 
-// Étape 1 : Upload APK et retourne les icônes disponibles
-app.post('/api/apps/web/preview', requireAuth, requireAdmin, uploadWeb.single('apk'), async (req, res) => {
+// Nouvelle route upload — étape 1 : upload APK et extraction auto
+app.post('/api/apps/web/upload', requireAuth, requireAdmin, uploadWeb.single('apk'), async (req, res) => {
+    const { appName } = req.body;
     const apkFile = req.file;
+
     if (!apkFile) return res.status(400).json({ error: "APK manquant" });
+    if (!appName) return res.status(400).json({ error: "Nom manquant" });
 
     try {
-        const AdmZip = require('adm-zip');
-        const zip = new AdmZip(apkFile.path);
-        const entries = zip.getEntries();
+        console.log(`📦 Extraction infos APK : ${apkFile.originalname}`);
 
-        // Collecte toutes les icônes PNG/WEBP
-        const icons = [];
-        const iconPriority = [
-            'mipmap-xxxhdpi', 'mipmap-xxhdpi', 'mipmap-xhdpi', 'mipmap-hdpi',
-            'drawable-xxxhdpi', 'drawable-xxhdpi', 'drawable-xhdpi', 'drawable-hdpi',
-            'mipmap-anydpi', 'mipmap-mdpi', 'drawable-mdpi'
-        ];
+        // 1. Extraire package + version depuis l'APK
+        const apkInfo = await extractApkInfo(apkFile.path);
+        console.log(`📋 Info APK extraites :`, apkInfo);
 
-        for (const entry of entries) {
-            if (
-                (entry.entryName.endsWith('.png') || entry.entryName.endsWith('.webp')) &&
-                !entry.entryName.includes('9.png') // Exclut les 9-patch
-            ) {
-                // Sauvegarde temporairement l'icône
-                const tmpName = `tmp_${Date.now()}_${icons.length}.png`;
-                const tmpPath = path.join(__dirname, 'uploads/tmp', tmpName);
-                fs.writeFileSync(tmpPath, entry.getData());
+        if (!apkInfo?.packageName || !isValidPackageName(apkInfo.packageName)) {
+            // Fallback : demande à l'utilisateur
+            return res.json({
+                success: true,
+                needsPackageName: true,
+                tmpApk: path.basename(apkFile.path),
+                version: apkInfo?.version || null,
+                message: "Impossible d'extraire le package name automatiquement"
+            });
+        }
 
-                // Calcule la priorité
-                const priority = iconPriority.findIndex(p => entry.entryName.includes(p));
+        // 2. Récupérer icône + version Play Store
+        console.log(`🔍 Recherche Play Store : ${apkInfo.packageName}`);
+        const playInfo = await getPlayStoreInfo(apkInfo.packageName);
 
-                icons.push({
-                    path: entry.entryName,
-                    tmpFile: tmpName,
-                    priority: priority === -1 ? 999 : priority,
-                    url: `/uploads/tmp/${tmpName}`
+        // 3. Télécharger l'icône Play Store si disponible
+        let iconSaved = false;
+        if (playInfo?.icon) {
+            try {
+                const iconResponse = await new Promise((resolve, reject) => {
+                    https.get(playInfo.icon, resolve).on('error', reject);
                 });
+                const iconPath = path.join(__dirname, 'uploads', `${apkInfo.packageName}.png`);
+                const iconStream = fs.createWriteStream(iconPath);
+                iconResponse.pipe(iconStream);
+                await new Promise((resolve) => iconStream.on('finish', resolve));
+                iconSaved = true;
+                console.log(`🖼️ Icône Play Store sauvegardée pour ${apkInfo.packageName}`);
+            } catch (e) {
+                console.log(`⚠️ Impossible de télécharger l'icône Play Store : ${e.message}`);
             }
         }
 
-        // Trie par priorité
-        icons.sort((a, b) => a.priority - b.priority);
+        // 4. Si pas d'icône Play Store, extraire depuis l'APK
+        if (!iconSaved) {
+            const zip = new AdmZip(apkFile.path);
+            const entries = zip.getEntries();
+            const iconPriority = ['mipmap-xxxhdpi', 'mipmap-xxhdpi', 'mipmap-xhdpi', 'mipmap-hdpi'];
+            let iconEntry = null;
 
-        // Sauvegarde le chemin de l'APK temporaire pour l'étape 2
+            for (const priority of iconPriority) {
+                iconEntry = entries.find(e =>
+                    e.entryName.includes(priority) &&
+                    (e.entryName.endsWith('.png') || e.entryName.endsWith('.webp')) &&
+                    !e.entryName.includes('9.png')
+                );
+                if (iconEntry) break;
+            }
+
+            if (iconEntry) {
+                const iconPath = path.join(__dirname, 'uploads', `${apkInfo.packageName}.png`);
+                fs.writeFileSync(iconPath, iconEntry.getData());
+                console.log(`🖼️ Icône extraite depuis APK : ${iconEntry.entryName}`);
+            }
+        }
+
         res.json({
             success: true,
+            needsPackageName: false,
             tmpApk: path.basename(apkFile.path),
-            icons: icons.slice(0, 20) // Max 20 icônes affichées
+            packageName: apkInfo.packageName,
+            version: apkInfo.version,
+            playStoreVersion: playInfo?.version || null,
+            playStoreName: playInfo?.title || null,
+            iconFromPlayStore: iconSaved
         });
 
     } catch (e) {
-        console.error(e);
+        console.error('❌ Erreur upload:', e.message);
         res.status(500).json({ error: e.message });
     }
 });
 
-// Étape 2 : Confirme l'ajout avec l'icône choisie
+// Nouvelle route upload — étape 2 : confirmer l'ajout
 app.post('/api/apps/web/confirm', requireAuth, requireAdmin, (req, res) => {
-    const { appName, packageName, tmpApk, selectedIcon } = req.body;
+    const { appName, packageName, tmpApk, version, playStoreVersion } = req.body;
 
     if (!appName || !packageName || !tmpApk) {
         return res.status(400).json({ error: "Données manquantes" });
@@ -319,33 +628,57 @@ app.post('/api/apps/web/confirm', requireAuth, requireAdmin, (req, res) => {
         return res.status(400).json({ error: "Nom de package invalide" });
     }
 
-    // Copie l'icône choisie
-    if (selectedIcon) {
-        const srcIcon = path.join(__dirname, 'uploads/tmp', selectedIcon);
-        const destIcon = path.join(__dirname, 'uploads', `${packageName}.png`);
-        if (fs.existsSync(srcIcon)) fs.copyFileSync(srcIcon, destIcon);
-    }
-
-    // Déplace l'APK
     const srcApk = path.join(__dirname, 'uploads/tmp', tmpApk);
     const destApk = path.join(__dirname, 'uploads/apks', `${packageName}.apk`);
     if (fs.existsSync(srcApk)) fs.renameSync(srcApk, destApk);
 
-    // Nettoie les icônes temporaires
-    const tmpDir = path.join(__dirname, 'uploads/tmp');
-    fs.readdirSync(tmpDir).forEach(f => {
-        if (f.startsWith('tmp_')) fs.unlinkSync(path.join(tmpDir, f));
-    });
-
     db.run(
-        "INSERT OR REPLACE INTO apps (appName, package) VALUES (?, ?)",
-        [appName, packageName],
+        "INSERT OR REPLACE INTO apps (appName, package, version, play_store_version, last_checked) VALUES (?, ?, ?, ?, datetime('now'))",
+        [appName, packageName, version || null, playStoreVersion || null],
         function(err) {
             if (err) return res.status(400).json({ error: err.message });
-            console.log(`📦 App confirmée : ${appName} (${packageName})`);
+            console.log(`✅ App confirmée : ${appName} (${packageName}) v${version}`);
             res.json({ success: true, id: this.lastID });
         }
     );
+});
+
+// Route pour vérifier les MAJ Play Store (toutes les apps)
+app.post('/api/apps/check-updates', requireAuth, requireAdmin, async (req, res) => {
+    db.all("SELECT id, appName, package, version, play_store_version FROM apps", [], async (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        const results = [];
+        for (const app of rows) {
+            try {
+                const playInfo = await getPlayStoreInfo(app.package);
+                if (playInfo) {
+                    db.run(
+                        "UPDATE apps SET play_store_version = ?, last_checked = datetime('now') WHERE id = ?",
+                        [playInfo.version, app.id]
+                    );
+                    results.push({
+                        package: app.package,
+                        appName: app.appName,
+                        currentVersion: app.version,
+                        playStoreVersion: playInfo.version,
+                        hasUpdate: playInfo.version !== app.version
+                    });
+                }
+            } catch (e) {
+                console.log(`⚠️ Erreur check update ${app.package}: ${e.message}`);
+            }
+        }
+        res.json(results);
+    });
+});
+
+// Route pour récupérer les apps avec info de version
+app.get('/api/apps', requireAuth, (req, res) => {
+    db.all("SELECT id, appName, package as packageName, version, play_store_version FROM apps", [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
 });
 
 app.get('/api/launcher/latest', requireAuth, async (req, res) => {
@@ -382,15 +715,21 @@ app.post('/api/login', async (req, res) => {
     const authResult = await checkUser(username, password);
 
     if (authResult.success) {
-        // Vérifie si le compte est blacklisté
         db.get("SELECT * FROM users_blacklist WHERE username = ?", [username], (err, row) => {
             if (row) {
+                logActivity(username, deviceId, 'blocked', { reason: row.reason }, req.ip);
                 console.log(`🚫 Compte bloqué : ${username}`);
                 return res.status(403).json({
                     success: false,
                     message: `Votre compte a été bloqué. Raison : ${row.reason || 'Non précisée'}`
                 });
             }
+
+            // Log connexion réussie
+            logActivity(username, deviceId, 'login', {
+                role: authResult.role,
+                displayName: authResult.displayName
+            }, req.ip);
 
             db.run("INSERT INTO connection_logs (username, device_id) VALUES (?, ?)", [username, deviceId]);
             db.run("UPDATE devices SET assigned_user = ? WHERE device_id = ?", [authResult.displayName, deviceId]);
@@ -400,6 +739,8 @@ app.post('/api/login', async (req, res) => {
             res.json({ ...authResult, token });
         });
     } else {
+        // Log tentative échouée
+        logActivity(username, deviceId, 'login_failed', { reason: authResult.message }, req.ip);
         res.status(401).json(authResult);
     }
 });
