@@ -739,6 +739,14 @@
                 <span class="nav-icon">👤</span>
                 Utilisateurs
             </button>
+            <button class="nav-item" onclick="showPage('historique')">
+                <span class="nav-icon">📊</span>
+                Historique apps
+            </button>
+            <button class="nav-item" onclick="showPage('backups')">
+                <span class="nav-icon">💾</span>
+                Sauvegardes
+            </button>
         </div>
     </div>
 
@@ -809,35 +817,59 @@
             </div>
         </div>
 
-        <!-- PAGE LOGS -->
-        <div class="page" id="page-logs">
-            <div class="page-header">
-                <h1>Journaux de connexion</h1>
-                <p>Historique des connexions sur les tablettes</p>
-            </div>
+<!-- PAGE LOGS -->
+<div class="page" id="page-logs">
+    <div class="page-header">
+        <h1>Journaux d'activité</h1>
+        <p>Historique détaillé de toutes les actions sur le système</p>
+    </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <h3>Dernières connexions</h3>
-                        <p>50 dernières entrées</p>
-                    </div>
-                    <button class="btn btn-ghost" onclick="loadLogs()">🔄 Rafraîchir</button>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Utilisateur</th>
-                            <th>Tablette</th>
-                            <th>Date & Heure</th>
-                        </tr>
-                    </thead>
-                    <tbody id="logsBody">
-                        <tr><td colspan="3" class="loading-state"><div class="spinner"></div> Chargement...</td></tr>
-                    </tbody>
-                </table>
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>Activité récente</h3>
+                <p>100 dernières entrées</p>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <input type="text" class="form-control" id="logFilterUser"
+                    placeholder="Utilisateur..." style="width:160px;"
+                    oninput="loadActivityLogs()">
+                <select class="form-control" id="logFilterType"
+                    style="width:160px;" onchange="loadActivityLogs()">
+                    <option value="">Tous les événements</option>
+                    <option value="login">Connexion</option>
+                    <option value="login_failed">Échec connexion</option>
+                    <option value="logout">Déconnexion</option>
+                    <option value="app_open">Ouverture app</option>
+                    <option value="app_install">Installation app</option>
+                    <option value="blocked">Compte bloqué</option>
+                </select>
+                <input type="text" class="form-control" id="logFilterDevice"
+                    placeholder="Tablette..." style="width:160px;"
+                    oninput="loadActivityLogs()">
+                <button class="btn btn-ghost" onclick="clearLogFilters()">✕ Reset</button>
+                <button class="btn btn-ghost" onclick="loadActivityLogs()">🔄</button>
             </div>
         </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Utilisateur</th>
+                    <th>Événement</th>
+                    <th>Détails</th>
+                    <th>Tablette</th>
+                    <th>IP</th>
+                    <th>Date & Heure</th>
+                </tr>
+            </thead>
+            <tbody id="activityLogsBody">
+                <tr><td colspan="6" class="loading-state">
+                    <div class="spinner"></div> Chargement...
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
 
         <!-- PAGE UTILISATEURS -->
         <div class="page" id="page-utilisateurs">
@@ -870,6 +902,84 @@
                 </table>
             </div>
         </div>
+
+        <!-- PAGE HISTORIQUE -->
+        <div class="page" id="page-historique">
+            <div class="page-header">
+                <h1>Historique des applications</h1>
+                <p>Suivi des applications ouvertes par les élèves</p>
+            </div>
+        
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h3>Journal d'utilisation</h3>
+                        <p>200 dernières entrées</p>
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            id="filterUsername" 
+                            placeholder="Filtrer par identifiant..."
+                            style="width:220px;"
+                            oninput="loadAppHistory()"
+                        >
+                        <button class="btn btn-ghost" onclick="document.getElementById('filterUsername').value='';loadAppHistory()">✕</button>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Utilisateur</th>
+                            <th>Application</th>
+                            <th>Package</th>
+                            <th>Tablette</th>
+                            <th>Action</th>
+                            <th>Date & Heure</th>
+                        </tr>
+                    </thead>
+                    <tbody id="appHistoryBody">
+                        <tr><td colspan="6" class="loading-state"><div class="spinner"></div> Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- PAGE BACKUPS -->
+<div class="page" id="page-backups">
+    <div class="page-header">
+        <h1>Sauvegardes</h1>
+        <p>Backups automatiques de la base de données — conservés 10 derniers</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>Fichiers de sauvegarde</h3>
+                <p>Backup automatique toutes les 6 heures</p>
+            </div>
+            <button class="btn btn-primary" onclick="triggerBackup()">
+                💾 Backup maintenant
+            </button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Fichier</th>
+                    <th>Taille</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="backupsBody">
+                <tr><td colspan="4" class="loading-state">
+                    <div class="spinner"></div> Chargement...
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
 
     </div>
 </div>
@@ -950,8 +1060,10 @@
 
         if (page === 'tablettes') loadDevices();
         if (page === 'applications') loadApps();
-        if (page === 'logs') loadLogs();
+        if (page === 'logs') loadActivityLogs();
         if (page === 'utilisateurs') loadUsersBlacklist();
+        if (page === 'historique') loadAppHistory();
+        if (page === 'backups') loadBackups();
     }
 
     // --- API HELPER ---
@@ -968,6 +1080,143 @@
         if (res.status === 401) { logout(); return null; }
         return res.json();
     }
+
+    async function loadBackups() {
+    const body = document.getElementById('backupsBody');
+    body.innerHTML = '<tr><td colspan="4" class="loading-state"><div class="spinner"></div></td></tr>';
+
+    const backups = await api('GET', '/api/backups');
+
+    if (!backups || backups.length === 0) {
+        body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:#6B7280">Aucun backup disponible</td></tr>';
+        return;
+    }
+
+    body.innerHTML = backups.map((b, index) => `
+        <tr>
+            <td>
+                <strong>${b.name}</strong>
+                ${index === 0 ? '<span style="margin-left:8px;background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">DERNIER</span>' : ''}
+            </td>
+            <td>${(b.size / 1024).toFixed(1)} Ko</td>
+            <td>${new Date(b.createdAt).toLocaleString('fr-FR')}</td>
+            <td>
+                <a href="/api/backups/${b.name}" 
+                   onclick="this.closest('tr').querySelector('td:last-child button') && null"
+                   download
+                   class="btn btn-ghost">
+                    ⬇️ Télécharger
+                </a>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function triggerBackup() {
+    const res = await api('POST', '/api/backups');
+    if (res?.success) {
+        showToast('✅ Backup lancé avec succès', 'success');
+        setTimeout(loadBackups, 1000);
+    } else {
+        showToast('Erreur lors du backup', 'error');
+    }
+}
+
+    async function loadAppHistory() {
+    const body = document.getElementById('appHistoryBody');
+    body.innerHTML = '<tr><td colspan="6" class="loading-state"><div class="spinner"></div></td></tr>';
+
+    const username = document.getElementById('filterUsername').value.trim();
+    const url = username ? `/api/logs/apps?username=${encodeURIComponent(username)}` : '/api/logs/apps';
+    const logs = await api('GET', url);
+
+    if (!logs || logs.length === 0) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#6B7280">Aucune entrée</td></tr>';
+        return;
+    }
+
+    body.innerHTML = logs.map(log => `
+        <tr>
+            <td><strong>${log.username}</strong></td>
+            <td>${log.app_name || '—'}</td>
+            <td style="font-size:11px;color:#9CA3AF">${log.package_name}</td>
+            <td>${log.device_id}</td>
+            <td>
+                <span class="badge ${log.action === 'open' ? 'badge-actif' : 'badge-inactif'}">
+                    ${log.action === 'open' ? '▶ Ouverture' : '■ Fermeture'}
+                </span>
+            </td>
+            <td>${new Date(log.timestamp + 'Z').toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}</td>
+        </tr>
+    `).join('');
+}
+
+const EVENT_LABELS = {
+    'login':        { label: 'Connexion',         color: '#10B981', icon: '🔓' },
+    'login_failed': { label: 'Échec connexion',   color: '#F59E0B', icon: '⚠️' },
+    'logout':       { label: 'Déconnexion',       color: '#6B7280', icon: '🔒' },
+    'app_open':     { label: 'App ouverte',       color: '#003189', icon: '▶️' },
+    'app_install':  { label: 'Installation',      color: '#6C63FF', icon: '📦' },
+    'blocked':      { label: 'Compte bloqué',     color: '#E1000F', icon: '🚫' },
+    'update':       { label: 'Mise à jour',       color: '#F59E0B', icon: '🔄' },
+};
+
+function getEventBadge(type) {
+    const e = EVENT_LABELS[type] || { label: type, color: '#6B7280', icon: '📋' };
+    return `<span style="
+        display:inline-flex;align-items:center;gap:4px;
+        padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;
+        background:${e.color}18;color:${e.color};
+    ">${e.icon} ${e.label}</span>`;
+}
+
+function formatDetails(details) {
+    if (!details || Object.keys(details).length === 0) return '—';
+    if (details.appName) return details.appName;
+    if (details.displayName) return details.displayName;
+    if (details.reason) return details.reason;
+    if (details.role) return `Rôle: ${details.role}`;
+    return JSON.stringify(details);
+}
+
+async function loadActivityLogs() {
+    const body = document.getElementById('activityLogsBody');
+    body.innerHTML = '<tr><td colspan="6" class="loading-state"><div class="spinner"></div></td></tr>';
+
+    const username = document.getElementById('logFilterUser').value.trim();
+    const eventType = document.getElementById('logFilterType').value;
+    const deviceId = document.getElementById('logFilterDevice').value.trim();
+
+    let url = '/api/logs/activity?limit=100';
+    if (username) url += `&username=${encodeURIComponent(username)}`;
+    if (eventType) url += `&event_type=${encodeURIComponent(eventType)}`;
+    if (deviceId) url += `&device_id=${encodeURIComponent(deviceId)}`;
+
+    const logs = await api('GET', url);
+
+    if (!logs || logs.length === 0) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#6B7280">Aucune activité</td></tr>';
+        return;
+    }
+
+    body.innerHTML = logs.map(log => `
+        <tr>
+            <td><strong>${log.username || '—'}</strong></td>
+            <td>${getEventBadge(log.event_type)}</td>
+            <td style="font-size:13px;color:#6B7280">${formatDetails(log.details)}</td>
+            <td>${log.device_id || '—'}</td>
+            <td style="font-size:11px;color:#9CA3AF">${log.ip || '—'}</td>
+            <td>${new Date(log.timestamp + 'Z').toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}</td>
+        </tr>
+    `).join('');
+}
+
+function clearLogFilters() {
+    document.getElementById('logFilterUser').value = '';
+    document.getElementById('logFilterType').value = '';
+    document.getElementById('logFilterDevice').value = '';
+    loadActivityLogs();
+}
 
 async function loadDevices() {
     const grid = document.getElementById('devicesGrid');
@@ -1195,27 +1444,6 @@ async function deleteDevice(deviceId) {
         showToast(`${name} supprimée`, 'success');
         loadApps();
     }
-
-    // --- LOGS ---
-    async function loadLogs() {
-        const body = document.getElementById('logsBody');
-        body.innerHTML = '<tr><td colspan="3" class="loading-state"><div class="spinner"></div> Chargement...</td></tr>';
-
-        const logs = await api('GET', '/api/logs');
-        if (!logs || logs.length === 0) {
-            body.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:30px;color:#6B7280">Aucun journal disponible</td></tr>';
-            return;
-        }
-
-        body.innerHTML = logs.map(log => `
-            <tr>
-                <td><strong>${log.username}</strong></td>
-                <td>${log.device_id}</td>
-                <td>${new Date(log.timestamp).toLocaleString('fr-FR')}</td>
-            </tr>
-        `).join('');
-    }
-
     // --- TOAST ---
     function showToast(msg, type = 'success') {
         const container = document.getElementById('toastContainer');
@@ -1244,39 +1472,40 @@ async function deleteDevice(deviceId) {
 let tmpApkName = null;
 let selectedIconFile = null;
 
+let uploadedApkData = null;
+
 function openModalAddApp() {
     document.getElementById('addAppName').value = '';
-    document.getElementById('addAppPackage').value = '';
     document.getElementById('addAppFile').value = '';
     document.getElementById('uploadProgress').style.display = 'none';
     document.getElementById('progressBar').style.width = '0%';
     document.getElementById('stepUpload').style.display = 'block';
-    document.getElementById('stepIcon').style.display = 'none';
-    tmpApkName = null;
-    selectedIconFile = null;
+    document.getElementById('stepConfirm').style.display = 'none';
+    uploadedApkData = null;
     document.getElementById('modalAddApp').classList.add('open');
 }
 
-function backToUpload() {
+function backToUploadStep() {
     document.getElementById('stepUpload').style.display = 'block';
-    document.getElementById('stepIcon').style.display = 'none';
+    document.getElementById('stepConfirm').style.display = 'none';
 }
 
-async function uploadApkPreview() {
+async function uploadApk() {
     const appName = document.getElementById('addAppName').value.trim();
-    const packageName = document.getElementById('addAppPackage').value.trim();
     const file = document.getElementById('addAppFile').files[0];
 
-    if (!appName || !packageName || !file) {
+    if (!appName || !file) {
         showToast('Veuillez remplir tous les champs', 'error');
         return;
     }
 
     document.getElementById('btnUpload').disabled = true;
     document.getElementById('uploadProgress').style.display = 'block';
+    document.getElementById('uploadStatusText').textContent = 'Upload en cours...';
 
     const formData = new FormData();
     formData.append('apk', file);
+    formData.append('appName', appName);
 
     try {
         const result = await new Promise((resolve, reject) => {
@@ -1287,93 +1516,94 @@ async function uploadApkPreview() {
                     const pct = Math.round((e.loaded / e.total) * 100);
                     document.getElementById('progressBar').style.width = `${pct}%`;
                     document.getElementById('progressPercent').textContent = `${pct}%`;
+                    if (pct === 100) {
+                        document.getElementById('uploadStatusText').textContent = '🔍 Analyse du Play Store...';
+                    }
                 }
             });
 
             xhr.addEventListener('load', () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    resolve(JSON.parse(xhr.responseText));
-                } else {
-                    reject(new Error('Erreur upload'));
-                }
+                if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+                else reject(new Error('Erreur upload'));
             });
 
             xhr.addEventListener('error', () => reject(new Error('Erreur réseau')));
-            xhr.open('POST', '/api/apps/web/preview');
+            xhr.open('POST', '/api/apps/web/upload');
             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             xhr.send(formData);
         });
 
-        tmpApkName = result.tmpApk;
+        uploadedApkData = result;
 
-        // Affiche les icônes
-        const grid = document.getElementById('iconGrid');
-        grid.innerHTML = result.icons.map((icon, i) => `
-            <div onclick="selectIcon('${icon.tmpFile}', this)" style="
-                cursor: pointer;
-                border: 2px solid #E5E7EB;
-                border-radius: 10px;
-                padding: 8px;
-                text-align: center;
-                transition: all 0.2s;
-            ">
-                <img src="${icon.url}" style="width:50px;height:50px;object-fit:contain;border-radius:8px;" 
-                     onerror="this.parentElement.style.display='none'">
-                <div style="font-size:9px;color:#9CA3AF;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                    ${icon.path.split('/').pop()}
-                </div>
-            </div>
-        `).join('');
-
+        // Affiche l'étape 2
         document.getElementById('stepUpload').style.display = 'none';
-        document.getElementById('stepIcon').style.display = 'block';
+        document.getElementById('stepConfirm').style.display = 'block';
+
+        // Remplit le résumé
+        document.getElementById('summaryName').textContent = result.playStoreName || appName;
+        document.getElementById('summaryPackage').textContent = result.packageName || 'Package non détecté';
+
+        // Icône
+        if (result.packageName) {
+            document.getElementById('summaryIcon').src = `/uploads/${result.packageName}.png`;
+        }
+
+        // Versions
+        const versionsDiv = document.getElementById('summaryVersions');
+        versionsDiv.innerHTML = '';
+        if (result.version) {
+            versionsDiv.innerHTML += `<span style="background:#E8EDF8;color:#003189;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;">APK v${result.version}</span>`;
+        }
+        if (result.playStoreVersion) {
+            versionsDiv.innerHTML += `<span style="background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;">Play Store v${result.playStoreVersion}</span>`;
+        }
+        if (!result.playStoreVersion) {
+            versionsDiv.innerHTML += `<span style="background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;">⚠️ Non trouvé sur Play Store</span>`;
+        }
+
+        // Package manuel si pas détecté
+        if (result.needsPackageName) {
+            document.getElementById('manualPackageGroup').style.display = 'block';
+        }
 
     } catch (e) {
-        showToast('Erreur lors de l\'upload', 'error');
+        showToast("Erreur lors de l'upload", 'error');
         console.error(e);
     } finally {
         document.getElementById('btnUpload').disabled = false;
     }
 }
 
-function selectIcon(tmpFile, el) {
-    // Déselectionne tout
-    document.querySelectorAll('#iconGrid > div').forEach(d => {
-        d.style.borderColor = '#E5E7EB';
-        d.style.background = 'white';
-    });
-
-    // Sélectionne celui cliqué
-    el.style.borderColor = '#003189';
-    el.style.background = '#EEF2FF';
-    selectedIconFile = tmpFile;
-    document.getElementById('btnConfirm').disabled = false;
-}
-
 async function confirmAddApp() {
+    if (!uploadedApkData) return;
+
     const appName = document.getElementById('addAppName').value.trim();
-    const packageName = document.getElementById('addAppPackage').value.trim();
+    let packageName = uploadedApkData.packageName;
+
+    if (uploadedApkData.needsPackageName) {
+        packageName = document.getElementById('manualPackageName').value.trim();
+        if (!packageName) {
+            showToast('Veuillez saisir le package name', 'error');
+            return;
+        }
+    }
 
     document.getElementById('btnConfirm').disabled = true;
 
-    try {
-        const res = await api('POST', '/api/apps/web/confirm', {
-            appName,
-            packageName,
-            tmpApk: tmpApkName,
-            selectedIcon: selectedIconFile
-        });
+    const res = await api('POST', '/api/apps/web/confirm', {
+        appName,
+        packageName,
+        tmpApk: uploadedApkData.tmpApk,
+        version: uploadedApkData.version,
+        playStoreVersion: uploadedApkData.playStoreVersion
+    });
 
-        if (res?.success) {
-            closeModal('modalAddApp');
-            showToast(`✅ ${appName} ajoutée avec succès`, 'success');
-            loadApps();
-        } else {
-            showToast(res?.error || 'Erreur', 'error');
-        }
-    } catch (e) {
-        showToast('Erreur', 'error');
-    } finally {
+    if (res?.success) {
+        closeModal('modalAddApp');
+        showToast(`✅ ${appName} ajoutée avec succès`, 'success');
+        loadApps();
+    } else {
+        showToast(res?.error || 'Erreur', 'error');
         document.getElementById('btnConfirm').disabled = false;
     }
 }
@@ -1381,59 +1611,63 @@ async function confirmAddApp() {
 
 <!-- MODAL AJOUT APP -->
 <div class="modal-overlay" id="modalAddApp">
-    <div class="modal" style="max-width: 600px;">
+    <div class="modal" style="max-width:560px;">
         <h3>➕ Ajouter une application</h3>
-        <p>Uploadez un APK — choisissez ensuite l'icône à utiliser.</p>
+        <p>Uploadez un APK — le package et l'icône sont extraits automatiquement.</p>
 
-        <!-- ÉTAPE 1 -->
+        <!-- ÉTAPE 1 : Upload -->
         <div id="stepUpload">
             <div class="form-group">
-                <label class="form-label">Nom de l'application</label>
+                <label class="form-label">Nom affiché</label>
                 <input type="text" class="form-control" id="addAppName" placeholder="Ex: Scratch">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Nom du package</label>
-                <input type="text" class="form-control" id="addAppPackage" placeholder="Ex: org.scratch">
             </div>
             <div class="form-group">
                 <label class="form-label">Fichier APK</label>
                 <input type="file" class="form-control" id="addAppFile" accept=".apk">
             </div>
-
             <div id="uploadProgress" style="display:none;margin-bottom:15px;">
                 <div style="display:flex;justify-content:space-between;font-size:12px;color:#6B7280;margin-bottom:6px;">
-                    <span>Upload en cours...</span>
+                    <span id="uploadStatusText">Upload en cours...</span>
                     <span id="progressPercent">0%</span>
                 </div>
                 <div style="background:#E5E7EB;border-radius:99px;height:6px;overflow:hidden;">
                     <div id="progressBar" style="height:100%;background:linear-gradient(90deg,#003189,#4A7FE5);border-radius:99px;width:0%;transition:width 0.3s;"></div>
                 </div>
             </div>
-
             <div class="modal-actions">
                 <button class="btn btn-ghost" onclick="closeModal('modalAddApp')">Annuler</button>
-                <button class="btn btn-primary" onclick="uploadApkPreview()" id="btnUpload">Suivant →</button>
+                <button class="btn btn-primary" onclick="uploadApk()" id="btnUpload">Analyser →</button>
             </div>
         </div>
 
-        <!-- ÉTAPE 2 : Sélection icône -->
-        <div id="stepIcon" style="display:none;">
-            <p style="font-size:13px;color:#6B7280;margin-bottom:15px;">
-                Sélectionnez l'icône à utiliser pour cette application :
-            </p>
-            <div id="iconGrid" style="
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-                gap: 10px;
-                max-height: 300px;
-                overflow-y: auto;
-                padding: 5px;
-                margin-bottom: 20px;
-            "></div>
+        <!-- ÉTAPE 2 : Confirmation avec infos extraites -->
+        <div id="stepConfirm" style="display:none;">
+            <!-- Résumé infos extraites -->
+            <div id="appSummary" style="
+                display:flex;align-items:center;gap:16px;
+                background:#F0F4FF;border-radius:12px;padding:16px;
+                margin-bottom:20px;border:1px solid #D1D9F0;
+            ">
+                <img id="summaryIcon" src="" style="width:56px;height:56px;border-radius:12px;object-fit:cover;" onerror="this.style.display='none'">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;color:#111827;font-size:15px;" id="summaryName"></div>
+                    <div style="font-size:12px;color:#6B7280;margin-top:2px;" id="summaryPackage"></div>
+                    <div style="display:flex;gap:8px;margin-top:6px;" id="summaryVersions"></div>
+                </div>
+            </div>
+
+            <!-- Package name si pas extrait auto -->
+            <div id="manualPackageGroup" style="display:none;">
+                <div class="form-group">
+                    <label class="form-label">Package name (non détecté automatiquement)</label>
+                    <input type="text" class="form-control" id="manualPackageName" placeholder="Ex: org.scratch">
+                </div>
+            </div>
+
             <div class="modal-actions">
-                <button class="btn btn-ghost" onclick="backToUpload()">← Retour</button>
-                <button class="btn btn-primary" onclick="confirmAddApp()" id="btnConfirm" disabled>
-                    ✅ Confirmer
+                <button class="btn btn-ghost" onclick="backToUploadStep()">← Retour</button>
+                <button class="btn btn-primary" onclick="confirmAddApp()" id="btnConfirm">
+                    ✅ Ajouter l'application
                 </button>
             </div>
         </div>

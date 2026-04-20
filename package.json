@@ -13,10 +13,12 @@
   "dependencies": {
     "adbkit-apkreader": "^3.2.0",
     "adm-zip": "^0.5.17",
+    "apk-parser3": "^0.1.7",
     "body-parser": "^2.2.2",
     "ejs": "^5.0.1",
     "express": "^5.2.1",
     "fs": "^0.0.1-security",
+    "google-play-scraper": "^10.1.2",
     "jsonwebtoken": "^9.0.3",
     "ldapjs": "^3.0.7",
     "morgan": "^1.10.1",
