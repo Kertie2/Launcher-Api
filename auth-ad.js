@@ -1,9 +1,7 @@
 const ldap = require('ldapjs');
+const config = require('./config');
 
-const AD_CONFIG = {
-    url: 'ldap://serveur-ad.exemple.local',
-    baseDN: 'DC=exemple,DC=local'
-};
+const AD_CONFIG = config.ad;
 
 function formatName(rawName) {
     if (!rawName) return "Élève";
@@ -16,7 +14,7 @@ function formatName(rawName) {
 function checkUser(username, password) {
     return new Promise((resolve) => {
         const client = ldap.createClient({ url: AD_CONFIG.url });
-        const userUPN = `${username}@exemple.local`;
+        const userUPN = `${username}@${AD_CONFIG.domaineUPN}`;
 
         client.bind(userUPN, password, (err) => {
             if (err) {
@@ -43,9 +41,9 @@ function checkUser(username, password) {
                     
                     const groupsString = groups.join(',').toLowerCase();
                     
-                    if (groupsString.includes('g_profs')) {
+                    if (groupsString.includes(AD_CONFIG.groupeAdmin)) {
                         userInfo.role = 'ADMIN';
-                    } else if (groupsString.includes('g_eleves')) {
+                    } else if (groupsString.includes(AD_CONFIG.groupeEleve)) {
                         userInfo.role = 'STUDENT';
                     } else {
                         userInfo.role = 'GUEST';
@@ -59,17 +57,6 @@ function checkUser(username, password) {
             });
         });
     });
-
-    // MOCK pour tests sans AD
-    // return new Promise((resolve) => {
-    //     if (username === "admin" && password === "admin") {
-    //         resolve({ success: true, username: "admin", displayName: "Admin", role: "ADMIN", details: "Professeur de test" });
-    //     } else if (username === "eleve" && password === "eleve") {
-    //         resolve({ success: true, username: "eleve", displayName: "Élève Test", role: "STUDENT", details: "Élève de test" });
-    //     } else {
-    //         resolve({ success: false, message: "Identifiants incorrects" });
-    //     }
-    // });
 }
 
 module.exports = { checkUser };

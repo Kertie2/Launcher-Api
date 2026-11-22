@@ -4,3 +4,8 @@ uploads/**/*.png
 *.exe
 node_modules/
 logs/
+.env
+uploads/
+backups/
+Thumbs.db
+public/images/logo.png

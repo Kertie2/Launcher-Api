@@ -1,6 +1,13 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    // Pas de valeur par défaut connue : sans JWT_SECRET, une clé aléatoire est tirée
+    // à chaque démarrage (les sessions ouvertes sont alors perdues au redémarrage).
+    JWT_SECRET = crypto.randomBytes(32).toString('hex');
+    console.warn("⚠️ JWT_SECRET non défini : clé aléatoire générée pour cette exécution.");
+}
 
 function generateToken(user) {
     return jwt.sign(

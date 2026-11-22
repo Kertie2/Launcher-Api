@@ -1,3 +1,4 @@
+require('./config');
 const express = require('express');
 const { checkUser } = require('./auth-ad');
 const db = require('./database');
@@ -24,7 +25,7 @@ function runBackup() {
     const backupPath = `./backups/launcher_${timestamp}.sqlite`;
 
     // Copie simple du fichier SQLite
-    fs.copyFile('./launcher.sqlite', backupPath, (err) => {
+    fs.copyFile(require('./config').baseDeDonnees, backupPath, (err) => {
         if (err) {
             console.error("❌ Erreur backup BDD:", err.message);
             return;
